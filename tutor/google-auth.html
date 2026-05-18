@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><title>RoyceAI — Google Sheets Auth</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{background:#0f0f1a;color:#e0e0f0;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px}
+.card{background:#1a1a2e;border:1px solid #2a2a4e;border-radius:16px;padding:40px;max-width:520px;width:100%;text-align:center}
+h1{font-size:1.4rem;margin:0 0 8px;color:#c084fc}
+p{color:#a0a0c0;margin:0 0 20px;font-size:.9rem;line-height:1.5}
+.loading{color:#a0a0c0;margin:20px 0;font-size:.85rem}
+.success{color:#22c55e;font-weight:600;font-size:1.1rem;margin:16px 0}
+.error{color:#ef4444;margin:12px 0;font-size:.85rem}
+.btn{display:inline-block;background:#c084fc;color:#0f0f1a;padding:14px 32px;border-radius:10px;text-decoration:none;font-weight:600;font-size:1rem;border:none;cursor:pointer;transition:all .2s;margin:8px}
+.btn:hover{background:#a855f7}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Google Sheets Access</h1>
+  <p>Authorize RoyceAI to update your student progress sheet</p>
+
+  <div id="step0">
+    <div id="loading" class="loading">Loading...</div>
+    <button id="authBtn" class="btn hidden" onclick="startAuth()">Sign in with Google</button>
+  </div>
+  <div id="step1" class="hidden">
+    <p class="loading">Opening Google consent...</p>
+  </div>
+  <div id="step2" class="hidden">
+    <div class="success">Authorized!</div>
+    <p>Student data will sync to Google Sheets every 6 hours.</p>
+  </div>
+  <div id="stepFail" class="hidden">
+    <div class="error" id="errorMsg">Something went wrong</div>
+    <button class="btn" onclick="location.reload()">Try Again</button>
+  </div>
+</div>
+
+<script src="https://accounts.google.com/gsi/client"></script>
+<script>
+const CLIENT_ID = '1015565646075-hpok5atm128orth0ci752j3vhdflq4m4.apps.googleusercontent.com';
+
+let tokenClient;
+
+function init() {
+  if (typeof google === 'undefined' || !google.accounts) {
+    setTimeout(init, 500);
+    return;
+  }
+
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/gmail.modify',
+    callback: (response) => {
+      if (response.access_token) {
+        // Send token to our API
+        fetch('https://chat-api-tawny-zeta.vercel.app/api/google-auth-exchange', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({
+            access_token: response.access_token,
+            expires_in: response.expires_in,
+            scope: response.scope
+          })
+        })
+        .then(r => r.json())
+        .then(data => {
+          document.getElementById('step1').classList.add('hidden');
+          if (data.success) {
+            document.getElementById('step2').classList.remove('hidden');
+          } else {
+            document.getElementById('errorMsg').textContent = 'Server error: ' + (data.error || 'Unknown');
+            document.getElementById('stepFail').classList.remove('hidden');
+          }
+        })
+        .catch(err => {
+          document.getElementById('step1').classList.add('hidden');
+          document.getElementById('errorMsg').textContent = 'Network error: ' + err.message;
+          document.getElementById('stepFail').classList.remove('hidden');
+        });
+      } else {
+        document.getElementById('step1').classList.add('hidden');
+        document.getElementById('errorMsg').textContent = response.error || 'Authorization denied';
+        document.getElementById('stepFail').classList.remove('hidden');
+      }
+    }
+  });
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('authBtn').classList.remove('hidden');
+}
+
+function startAuth() {
+  document.getElementById('step0').classList.add('hidden');
+  document.getElementById('step1').classList.remove('hidden');
+  tokenClient.requestAccessToken({prompt: 'consent'});
+}
+
+init();
+</script>
+</body>
+</html>

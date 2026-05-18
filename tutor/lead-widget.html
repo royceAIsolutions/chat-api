@@ -1,0 +1,126 @@
+<!-- Lead Comet Widget — Embed on any page -->
+<style>
+.lc-btn{position:fixed;bottom:24px;right:24px;width:56px;height:56px;border-radius:50%;background:#c084fc;color:#0f0f1a;border:none;font-size:24px;cursor:pointer;z-index:9999;box-shadow:0 4px 20px rgba(192,132,252,.4);transition:all .3s}
+.lc-btn:hover{transform:scale(1.1);background:#a855f7}
+.lc-panel{position:fixed;bottom:90px;right:24px;width:360px;max-height:520px;background:#1a1a2e;border:1px solid #2a2a4e;border-radius:16px;z-index:9999;display:none;overflow:hidden;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.lc-panel.open{display:flex;flex-direction:column}
+.lc-header{padding:16px 20px;background:#2a1a4e;border-bottom:1px solid #2a2a4e;font-weight:600;font-size:.95rem;color:#c084fc;display:flex;justify-content:space-between;align-items:center}
+.lc-close{background:none;border:none;color:#a0a0c0;font-size:20px;cursor:pointer}
+.lc-body{padding:16px 20px;overflow-y:auto;flex:1}
+.lc-body label{display:block;color:#a0a0c0;font-size:.8rem;margin:8px 0 4px}
+.lc-body input,.lc-body select,.lc-body textarea{width:100%;padding:10px 12px;background:#0f0f1a;border:1px solid #2a2a4e;border-radius:8px;color:#e0e0f0;font-size:.85rem;box-sizing:border-box;font-family:inherit}
+.lc-body textarea{resize:vertical;min-height:60px}
+.lc-submit{width:100%;padding:12px;background:#c084fc;color:#0f0f1a;border:none;border-radius:8px;font-weight:600;font-size:.9rem;cursor:pointer;margin-top:12px;transition:all .2s}
+.lc-submit:hover{background:#a855f7}
+.lc-thanks{display:none;text-align:center;padding:30px 20px}
+.lc-thanks.show{display:block}
+.lc-thanks h3{color:#c084fc;margin:0 0 8px}
+.lc-thanks p{color:#a0a0c0;font-size:.85rem;margin:0}
+.lc-error{color:#ef4444;font-size:.8rem;margin-top:4px;display:none}
+</style>
+
+<div id="lc-root">
+  <button class="lc-btn" id="lcBtn" onclick="toggleLeadPanel()">💬</button>
+  <div class="lc-panel" id="lcPanel">
+    <div class="lc-header">
+      <span>☄️ Talk to RoyceAI</span>
+      <button class="lc-close" onclick="toggleLeadPanel()">×</button>
+    </div>
+    <div class="lc-body" id="lcForm">
+      <p style="color:#a0a0c0;font-size:.85rem;margin:0 0 12px">Tell us about your needs — we'll qualify and respond fast.</p>
+      <label>Full Name *</label>
+      <input id="lcName" placeholder="Your name">
+      <label>Email *</label>
+      <input id="lcEmail" type="email" placeholder="your@email.com">
+      <label>What service?</label>
+      <select id="lcService">
+        <option value="">Select...</option>
+        <option value="Tutoring">Tutoring</option>
+        <option value="Trading">Trading</option>
+        <option value="Business Consulting">Business Consulting</option>
+        <option value="AI Development">AI Development</option>
+        <option value="Other">Other</option>
+      </select>
+      <label>Who is this for?</label>
+      <input id="lcFor" placeholder="Me / My child / My business">
+      <label>Budget</label>
+      <select id="lcBudget">
+        <option value="">Select...</option>
+        <option value="Under $100/mo">Under $100/mo</option>
+        <option value="$100-500/mo">$100-500/mo</option>
+        <option value="$500-1k/mo">$500-1k/mo</option>
+        <option value="$1k+/mo">$1k+/mo</option>
+        <option value="Not sure">Not sure</option>
+      </select>
+      <label>How soon?</label>
+      <select id="lcTimeline">
+        <option value="">Select...</option>
+        <option value="ASAP">ASAP</option>
+        <option value="This month">This month</option>
+        <option value="Next month">Next month</option>
+        <option value="Just exploring">Just exploring</option>
+      </select>
+      <label>Where did you hear about us?</label>
+      <select id="lcSource">
+        <option value="">Select...</option>
+        <option value="Google">Google</option>
+        <option value="Friend/Family">Friend/Family</option>
+        <option value="Social Media">Social Media</option>
+        <option value="Telegram">Telegram</option>
+        <option value="Other">Other</option>
+      </select>
+      <label>Message</label>
+      <textarea id="lcMessage" placeholder="Tell us more..."></textarea>
+      <div class="lc-error" id="lcError"></div>
+      <button class="lc-submit" onclick="submitLead()">🚀 Send</button>
+    </div>
+    <div class="lc-thanks" id="lcThanks">
+      <h3>✅ Sent!</h3>
+      <p>We'll review and get back to you within 24 hours. Check your email for next steps.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+function toggleLeadPanel() {
+  document.getElementById('lcPanel').classList.toggle('open');
+}
+
+function submitLead() {
+  const name = document.getElementById('lcName').value.trim();
+  const email = document.getElementById('lcEmail').value.trim();
+  const error = document.getElementById('lcError');
+  
+  if (!name) { error.textContent = 'Name is required'; error.style.display = 'block'; return; }
+  if (!email || !email.includes('@')) { error.textContent = 'Valid email is required'; error.style.display = 'block'; return; }
+  error.style.display = 'none';
+  
+  const lead = {
+    name, email,
+    service: document.getElementById('lcService').value,
+    for_whom: document.getElementById('lcFor').value.trim(),
+    budget: document.getElementById('lcBudget').value,
+    timeline: document.getElementById('lcTimeline').value,
+    source: document.getElementById('lcSource').value,
+    message: document.getElementById('lcMessage').value.trim(),
+    date: new Date().toISOString(),
+    source_page: window.location.pathname
+  };
+  
+  fetch('https://chat-api-tawny-zeta.vercel.app/api/leads', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(lead)
+  })
+  .then(r => r.json())
+  .then(data => {
+    document.getElementById('lcForm').style.display = 'none';
+    document.getElementById('lcThanks').classList.add('show');
+    setTimeout(() => { toggleLeadPanel(); }, 4000);
+  })
+  .catch(err => {
+    error.textContent = 'Network error. Please try again.';
+    error.style.display = 'block';
+  });
+}
+</script>
