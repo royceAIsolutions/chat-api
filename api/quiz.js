@@ -48,6 +48,8 @@ NEVER REPEAT A QUESTION. Every question must be unique and different from all pr
 
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response.
 
+CRITICAL FORMAT: The question number must be PLAIN TEXT, NOT bold/markdown. Use "Q2/10:" NOT "**Q2/10:**". No asterisks around the Q number.
+
 After Q${totalQ}, say "Quiz complete! Final score: X/${totalQ} (Y%)" and do NOT include a next question. NEVER end the quiz before Q${totalQ}. Keep going until Q${totalQ} no matter what.`;
 
   if (lowerNoSpace.includes('series66') || lower.includes('series 66')) {
