@@ -21,8 +21,24 @@ module.exports = async (req, res) => {
   // Unified quiz format — 33 questions across the board
   const totalQ = 33;
   const qLabel = `Q1/${totalQ}`;
+  
+  // Difficulty scaling based on history
+  let difficulty = "9th grade level";
+  if (history && Array.isArray(history)) {
+    const scoreLines = history.filter(m => m.role === 'assistant' && m.content && m.content.includes('Score:'));
+    const lastScores = scoreLines.slice(-3).map(s => {
+      const m = s.content.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+      return m ? parseInt(m[1]) / parseInt(m[2]) : 0;
+    });
+    const avg = lastScores.length ? lastScores.reduce((a,b) => a+b, 0) / lastScores.length : 0;
+    if (avg >= 0.95) difficulty = "advanced / college level — very challenging questions";
+    else if (avg >= 0.80) difficulty = "honors / AP level — harder than standard";
+    else if (avg >= 0.60) difficulty = "above grade level";
+  }
+  const difficultyNote = `The student has been performing at ${difficulty}. Adjust question difficulty accordingly.`;
 
   const quizFormat = `CRITICAL - QUIZ MODE. YOU MUST ALWAYS INCLUDE THE NEXT QUESTION WITH 4 OPTIONS.
+${difficultyNote}
 
 YOU START THE QUIZ. When the user says "start" or begins a subject, immediately ask Q1.
 
