@@ -168,26 +168,23 @@ ${quizFormat}`;
     }
     msgs.push({ role: 'user', content: message });
 
-    // Server-side rotation enforcement for grade9 — check last subject in history
+    // Server-side rotation enforcement for grade9 — force different subject every time
     if ((lower.includes('grade9') || lower.includes('freshman')) && history && Array.isArray(history)) {
       const lastAssistant = history.filter(m => m.role === 'assistant').pop();
       if (lastAssistant) {
         const subjMatch = lastAssistant.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
         if (subjMatch) {
           const lastSubj = subjMatch[1];
-          // Check if last 2+ questions are same subject — inject reminder
+          // Track cycle of all asked subjects
           const allSubjects = history.filter(m => m.role === 'assistant').map(m => {
             const s = m.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
             return s ? s[1] : null;
           }).filter(Boolean);
-          const recentSubjects = allSubjects.slice(-3);
-          const sameCount = recentSubjects.filter(s => s === lastSubj).length;
-          if (sameCount >= 2) {
-            // Force rotation
-            const nextSubjects = ["Biology", "English 9", "World History", "Health", "Math 1"];
-            const nextSubj = nextSubjects.find(s => s !== lastSubj) || "Biology";
-            msgs.push({ role: 'user', content: `[SYSTEM: Last question was ${lastSubj}. The next question MUST be ${nextSubj}. DO NOT repeat ${lastSubj}.]` });
-          }
+          // Get last subject in cycle (not necessarily last asked)
+          const ORDER = ["Math 1", "Biology", "English 9", "World History", "Health"];
+          const lastIdx = ORDER.indexOf(lastSubj);
+          const nextSubj = ORDER[(lastIdx + 1) % ORDER.length];
+          msgs.push({ role: 'user', content: `[SYSTEM ROTATION: Last question was ${lastSubj}. Next question MUST be ${nextSubj}. ABSOLUTELY DO NOT repeat ${lastSubj}.]` });
         }
       }
     }
