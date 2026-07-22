@@ -61,13 +61,15 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { message, history, student: studentName } = req.body;
+  const { message, history, student: studentName, subject } = req.body;
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey) return res.json({ reply: 'API key not configured.' });
   if (!message) return res.json({ reply: 'No message provided.' });
 
-  const lower = message.toLowerCase();
+  // If subject provided (from frontend), use it for system prompt matching
+  const matchSource = subject ? subject.toLowerCase() : message.toLowerCase();
+  const lower = matchSource;
   const lowerNoSpace = lower.replace(/\s+/g, '');
   let system = 'You are RoyceAI, an AI tutor. Be helpful and concise.';
 
@@ -169,7 +171,7 @@ ${quizFormat}`;
     msgs.push({ role: 'user', content: message });
 
     // Server-side rotation enforcement for grade9 — force different subject every time
-    if (system.includes('9th grade') && history && Array.isArray(history)) {
+    if ((system.includes('9th grade') || lower.includes('grade9')) && history && Array.isArray(history)) {
       const lastAssistant = history.filter(m => m.role === 'assistant').pop();
       if (lastAssistant) {
         const subjMatch = lastAssistant.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
