@@ -84,8 +84,8 @@ module.exports = async (req, res) => {
       return m ? parseInt(m[1]) / parseInt(m[2]) : 0;
     });
     const avg = lastScores.length ? lastScores.reduce((a,b) => a+b, 0) / lastScores.length : 0;
-    if (avg >= 0.95) difficulty = "advanced / college level — very challenging questions";
-    else if (avg >= 0.80) difficulty = "honors / AP level — harder than standard";
+    if (avg >= 0.95) difficulty = "SAT / AP exam level — maximum difficulty";
+    else if (avg >= 0.80) difficulty = "honors level — harder questions";
     else if (avg >= 0.60) difficulty = "above grade level";
   }
   const difficultyNote = `The student has been performing at ${difficulty}. Adjust question difficulty accordingly.`;
