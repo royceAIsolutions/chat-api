@@ -169,23 +169,32 @@ ${quizFormat}`;
     msgs.push({ role: 'user', content: message });
 
     // Server-side rotation enforcement for grade9 — force different subject every time
-    if ((lower.includes('grade9') || lower.includes('freshman')) && history && Array.isArray(history)) {
+    if (system.includes('9th grade') && history && Array.isArray(history)) {
       const lastAssistant = history.filter(m => m.role === 'assistant').pop();
       if (lastAssistant) {
         const subjMatch = lastAssistant.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
-        if (subjMatch) {
-          const lastSubj = subjMatch[1];
-          // Track cycle of all asked subjects
-          const allSubjects = history.filter(m => m.role === 'assistant').map(m => {
-            const s = m.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
-            return s ? s[1] : null;
-          }).filter(Boolean);
-          // Get last subject in cycle (not necessarily last asked)
-          const ORDER = ["Math 1", "Biology", "English 9", "World History", "Health"];
+        const lastSubj = subjMatch ? subjMatch[1] : null;
+        // Track cycle of all asked subjects
+        const allSubjects = history.filter(m => m.role === 'assistant').map(m => {
+          const s = m.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
+          return s ? s[1] : null;
+        }).filter(Boolean);
+        // Determine next subject
+        const ORDER = ["Math 1", "Biology", "English 9", "World History", "Health"];
+        let nextSubj;
+        if (lastSubj) {
           const lastIdx = ORDER.indexOf(lastSubj);
-          const nextSubj = ORDER[(lastIdx + 1) % ORDER.length];
-          msgs.push({ role: 'user', content: `[SYSTEM ROTATION: Last question was ${lastSubj}. Next question MUST be ${nextSubj}. ABSOLUTELY DO NOT repeat ${lastSubj}.]` });
+          nextSubj = ORDER[(lastIdx + 1) % ORDER.length];
+        } else if (allSubjects.length) {
+          // Label missing — pick the least recent subject
+          const askedCounts = ORDER.map(s => ({s, c: allSubjects.filter(x => x === s).length}));
+          askedCounts.sort((a,b) => a.c - b.c);
+          nextSubj = askedCounts[0].s;
+        } else {
+          nextSubj = "Biology"; // default first rotation
         }
+        const subjNote = lastSubj ? `Last question was ${lastSubj}.` : `Rotate subjects.`;
+        msgs.push({ role: 'user', content: `[SYSTEM: ${subjNote} Next question MUST be ${nextSubj}. DO NOT repeat the last subject.]` });
       }
     }
 
