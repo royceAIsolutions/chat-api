@@ -18,9 +18,8 @@ module.exports = async (req, res) => {
   const lowerNoSpace = lower.replace(/\s+/g, '');
   let system = 'You are RoyceAI, an AI tutor. Be helpful and concise.';
 
-  // Unified quiz format — 20 questions for exam prep, 10 for school subjects
-  const isExamPrep = lowerNoSpace.includes('series66') || lowerNoSpace.includes('series7') || lower.includes('nclex') || lower.includes('nursing') || lower.includes('rn');
-  const totalQ = isExamPrep ? 20 : 10;
+  // Unified quiz format — 33 questions across the board
+  const totalQ = 33;
   const qLabel = `Q1/${totalQ}`;
 
   const quizFormat = `CRITICAL - QUIZ MODE. YOU MUST ALWAYS INCLUDE THE NEXT QUESTION WITH 4 OPTIONS.
@@ -48,9 +47,11 @@ NEVER REPEAT A QUESTION. Every question must be unique and different from all pr
 
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response.
 
-CRITICAL FORMAT: The question number must be PLAIN TEXT, NOT bold/markdown. Use "Q2/10:" NOT "**Q2/10:**". No asterisks around the Q number.
+CRITICAL FORMAT: The question number must be PLAIN TEXT, NOT bold/markdown. Use "Q2/${totalQ}:" NOT "**Q2/${totalQ}:**". No asterisks around the Q number.
 
-After Q${totalQ}, say "Quiz complete! Final score: X/${totalQ} (Y%)" and do NOT include a next question. NEVER end the quiz before Q${totalQ}. Keep going until Q${totalQ} no matter what.`;
+After Q${totalQ}, say "Quiz complete! Final score: X/${totalQ} (Y%)" and do NOT include a next question. NEVER end the quiz before Q${totalQ}. Keep going until Q${totalQ} no matter what.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.`;
 
   if (lowerNoSpace.includes('series66') || lower.includes('series 66')) {
     system = `You are a Series 66 exam prep tutor. The Series 66 (Uniform Combined State Law Exam) covers state securities regulations, investment adviser registration, ethical practices, financial statements, and client communication.
