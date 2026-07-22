@@ -168,6 +168,30 @@ ${quizFormat}`;
     }
     msgs.push({ role: 'user', content: message });
 
+    // Server-side rotation enforcement for grade9 — check last subject in history
+    if ((lower.includes('grade9') || lower.includes('freshman')) && history && Array.isArray(history)) {
+      const lastAssistant = history.filter(m => m.role === 'assistant').pop();
+      if (lastAssistant) {
+        const subjMatch = lastAssistant.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
+        if (subjMatch) {
+          const lastSubj = subjMatch[1];
+          // Check if last 2+ questions are same subject — inject reminder
+          const allSubjects = history.filter(m => m.role === 'assistant').map(m => {
+            const s = m.content.match(/\[(Math 1|Biology|English 9|World History|Health)\]/);
+            return s ? s[1] : null;
+          }).filter(Boolean);
+          const recentSubjects = allSubjects.slice(-3);
+          const sameCount = recentSubjects.filter(s => s === lastSubj).length;
+          if (sameCount >= 2) {
+            // Force rotation
+            const nextSubjects = ["Biology", "English 9", "World History", "Health", "Math 1"];
+            const nextSubj = nextSubjects.find(s => s !== lastSubj) || "Biology";
+            msgs.push({ role: 'user', content: `[SYSTEM: Last question was ${lastSubj}. The next question MUST be ${nextSubj}. DO NOT repeat ${lastSubj}.]` });
+          }
+        }
+      }
+    }
+
     const body = JSON.stringify({ model: 'deepseek-chat', messages: msgs, temperature: 0.7, max_tokens: 1500 });
     const opts = { hostname: 'api.deepseek.com', path: '/v1/chat/completions', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(body) } };
