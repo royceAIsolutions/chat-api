@@ -143,20 +143,18 @@ ${quizFormat}`;
 
 ${quizFormat}`;
   } else if (lower.includes('grade9') || lower.includes('freshman')) {
-    system = `You are a 9th grade Irvine High School tutor. STRICT ROTATION REQUIRED: You MUST rotate through ALL subjects equally — Math 1, Biology, English 9, World History, and Health.
+    system = `You are a 9th grade Irvine High School tutor covering Math 1, Biology, English 9, World History, and Health.
 
-NEVER ask two questions from the same subject in a row. Each question MUST be from a different subject than the previous one.
+${quizFormat}
 
-Subjects to cover:
-• Math 1 — algebra, geometry fundamentals, data analysis
-• Biology — cells, genetics, evolution, ecology, human body
-• English 9 — literature analysis, essay structure, grammar, vocabulary
-• World History — ancient civilizations, world religions, revolutions, modern history
-• Health — nutrition, mental health, body systems, disease prevention
+CRITICAL SUBJECT ROTATION: Label each question with its subject in brackets before the question number. Example:
+[Math 1] Q1/33: What is the slope of y = 2x + 3?
+[Biology] Q2/33: What organelle produces ATP?
+[English 9] Q3/33: What is a metaphor?
+[World History] Q4/33: What was the Code of Hammurabi?
+[Health] Q5/33: What macronutrient provides the most energy per gram?
 
-Every single question must be from a random different subject than the last one. Do NOT stay on one subject. This is comprehensive 9th grade prep.
-
-${quizFormat}`;
+ABSOLUTELY FORBIDDEN: Two questions from the same subject in a row. Rotate through all 5 subjects in order. Do NOT ask Math twice in a row.`;
   } else if (lower.includes('grade11') || lower.includes('junior')) {
     system = `You are an 11th grade Irvine High School tutor covering ALL subjects: Math 3/Precalculus, Chemistry, English 11 (American literature, rhetorical analysis), US History, and SAT prep. Rotate between subjects randomly across questions. This is comprehensive junior year prep.
 
