@@ -34,6 +34,7 @@ module.exports = async (req, res) => {
     // Format into session structure
     const sessions = studentScores.map(s => ({
       date: s.date || '—',
+      time: s.ts || null,
       mode: s.subject || 'quiz',
       correct: s.correct,
       total: s.total,
