@@ -1,5 +1,58 @@
 const https = require('https');
 
+// GitHub API helper for saving scores (same pattern as save-score.js)
+function gh(method, path, body, token) {
+  return new Promise((resolve, reject) => {
+    const b = body ? JSON.stringify(body) : '';
+    const opts = { hostname: 'api.github.com', path: `/repos/royceAIsolutions/royceAIsolutions.github.io${path}`,
+      method, headers: { 'User-Agent': 'royceai', 'Authorization': `token ${token}`,
+        'Accept': 'application/vnd.github.v3+json', 'Content-Type': 'application/json' } };
+    if (b) { opts.headers['Content-Length'] = Buffer.byteLength(b); }
+    const r = https.request(opts, (resp) => { let c=[]; resp.on('data',d=>c.push(d)); resp.on('end',()=>{try{resolve(JSON.parse(Buffer.concat(c).toString()))}catch(e){resolve({})}}); });
+    r.on('error', reject); if (b) r.write(b); r.end();
+  });
+}
+
+async function saveQuizScore(student, correct, total, subject) {
+  const token = process.env.GH_TOKEN;
+  if (!token) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const pct = Math.round(correct / total * 100);
+  const entry = { student, correct, total, percent: pct, subject: subject || 'quiz', date: today, ts: Date.now() };
+  try {
+    const existing = await gh('GET', '/contents/tutor/scores.json', null, token);
+    let scores = [];
+    if (existing.content) scores = JSON.parse(Buffer.from(existing.content, 'base64').toString());
+    scores.push(entry);
+    const trimmed = scores.slice(-500);
+    const newContent = Buffer.from(JSON.stringify(trimmed, null, 2)).toString('base64');
+    await gh('PUT', '/contents/tutor/scores.json', { message: `Quiz: ${student} ${correct}/${total} (${pct}%)`, content: newContent, sha: existing.sha }, token);
+    
+    // Update users.json
+    const usersResp = await gh('GET', '/contents/tutor/users.json', null, token);
+    if (usersResp.content) {
+      let users = JSON.parse(Buffer.from(usersResp.content, 'base64').toString());
+      const idx = users.findIndex(u => u.id === student.toLowerCase().replace(/\s+/g, ' '));
+      if (idx >= 0) {
+        users[idx].today = `${correct}/${total} (${pct}%)`;
+        const thisMonth = today.slice(0, 7);
+        const studentScores = trimmed.filter(s => s.student === student);
+        const mtdScores = studentScores.filter(s => s.date && s.date.startsWith(thisMonth));
+        if (mtdScores.length) {
+          const mc = mtdScores.reduce((a,s) => a + s.correct, 0);
+          const mt = mtdScores.reduce((a,s) => a + s.total, 0);
+          users[idx].mtd = `${mc}/${mt} (${Math.round(mc/mt*100)}%)`;
+        }
+        const yc = studentScores.reduce((a,s) => a + s.correct, 0);
+        const yt = studentScores.reduce((a,s) => a + s.total, 0);
+        if (yt > 0) users[idx].ytd = `${yc}/${yt} (${Math.round(yc/yt*100)}%)`;
+        const newUsersContent = Buffer.from(JSON.stringify(users, null, 2)).toString('base64');
+        await gh('PUT', '/contents/tutor/users.json', { message: `Update ${student} score: ${correct}/${total}`, content: newUsersContent, sha: usersResp.sha }, token);
+      }
+    }
+  } catch (e) {}
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -125,7 +178,36 @@ ${quizFormat}`;
     });
 
     if (result.choices && result.choices[0] && result.choices[0].message) {
-      res.json({ reply: result.choices[0].message.content });
+      const reply = result.choices[0].message.content;
+      
+      // Auto-save score if quiz complete
+      if (studentName && reply.match(/Quiz\s*complete/i)) {
+        const scoreMatch = reply.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+        if (scoreMatch) {
+          const correct = parseInt(scoreMatch[1]);
+          const total = parseInt(scoreMatch[2]);
+          const pct = Math.round(correct / total * 100);
+          // Determine subject from history
+          let subject = 'quiz';
+          if (history && Array.isArray(history)) {
+            const firstMsg = history.find(m => m.role === 'user');
+            if (firstMsg) {
+              const t = firstMsg.content.toLowerCase();
+              if (t.includes('series66') || t.includes('series 66')) subject = 'series66';
+              else if (t.includes('series7') || t.includes('series 7')) subject = 'series7';
+              else if (t.includes('sat')) subject = 'sat';
+              else if (t.includes('math')) subject = 'math';
+              else if (t.includes('rn') || t.includes('nursing') || t.includes('nclex')) subject = 'rn';
+              else if (t.includes('grade9') || t.includes('freshman')) subject = 'grade9';
+              else if (t.includes('grade11') || t.includes('junior')) subject = 'grade11';
+            }
+          }
+          // Fire-and-forget save
+          saveQuizScore(studentName, correct, total, subject).catch(() => {});
+        }
+      }
+      
+      res.json({ reply });
     } else {
       res.json({ reply: 'AI service error.', debug: JSON.stringify(result).slice(0,200) });
     }
