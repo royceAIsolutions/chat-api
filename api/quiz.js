@@ -1,4 +1,5 @@
 const https = require('https');
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
 // GitHub API helper for saving scores (same pattern as save-score.js)
 function gh(method, path, body, token) {
@@ -202,7 +203,7 @@ ${quizFormat}`;
       }
     }
 
-    const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: msgs, temperature: 0.7, max_tokens: 1500 });
+    const body = JSON.stringify({ model: MODEL, messages: msgs, temperature: 0.7, max_tokens: 1500 });
     const opts = { hostname: 'api.deepseek.com', path: '/v1/chat/completions', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(body) } };
 

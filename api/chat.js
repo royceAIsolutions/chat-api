@@ -1,4 +1,5 @@
 const https = require('https');
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -27,7 +28,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: msgs, temperature: 0.7, max_tokens: 1500 });
+    const body = JSON.stringify({ model: MODEL, messages: msgs, temperature: 0.7, max_tokens: 1500 });
     const opts = { hostname: 'api.deepseek.com', path: '/v1/chat/completions', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(body) } };
 

@@ -1,4 +1,5 @@
 const https = require('https');
+const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -31,7 +32,7 @@ CRITICAL: Keep responses short. The user is in a live interview and needs the an
   ];
 
   const body = JSON.stringify({
-    model: 'deepseek-v4-flash',
+    model: MODEL,
     messages: messages,
     temperature: 0.3,
     max_tokens: 1500
