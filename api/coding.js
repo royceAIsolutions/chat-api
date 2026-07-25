@@ -31,7 +31,7 @@ CRITICAL: Keep responses short. The user is in a live interview and needs the an
   ];
 
   const body = JSON.stringify({
-    model: 'deepseek-chat',
+    model: 'deepseek-v4-flash',
     messages: messages,
     temperature: 0.3,
     max_tokens: 1500

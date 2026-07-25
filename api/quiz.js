@@ -122,7 +122,9 @@ CRITICAL FORMAT: The question number must be PLAIN TEXT, NOT bold/markdown. Use 
 
 After Q${totalQ}, say "Quiz complete! Final score: X/${totalQ} (Y%)" and do NOT include a next question. NEVER end the quiz before Q${totalQ}. Keep going until Q${totalQ} no matter what.
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.
-ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.`;
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.`;
 
   if (lowerNoSpace.includes('series66') || lower.includes('series 66')) {
     system = `You are a Series 66 exam prep tutor. The Series 66 (Uniform Combined State Law Exam) covers state securities regulations, investment adviser registration, ethical practices, financial statements, and client communication.
@@ -200,7 +202,7 @@ ${quizFormat}`;
       }
     }
 
-    const body = JSON.stringify({ model: 'deepseek-chat', messages: msgs, temperature: 0.7, max_tokens: 1500 });
+    const body = JSON.stringify({ model: 'deepseek-v4-flash', messages: msgs, temperature: 0.7, max_tokens: 1500 });
     const opts = { hostname: 'api.deepseek.com', path: '/v1/chat/completions', method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(body) } };
 
