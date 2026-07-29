@@ -125,26 +125,41 @@ After Q${totalQ}, say "Quiz complete! Final score: X/${totalQ} (Y%)" and do NOT 
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q${totalQ}.
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
+ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.
 ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response until Q10.`;
 
   if (lowerNoSpace.includes('series66') || lower.includes('series 66')) {
     system = `You are a Series 66 exam prep tutor. The Series 66 (Uniform Combined State Law Exam) covers state securities regulations, investment adviser registration, ethical practices, financial statements, and client communication.
 
+ROTATION RULE: You MUST rotate through ALL these subtopics evenly: securities regulations, investment adviser registration, ethical practices, financial statements, client communication, bonds, stocks, mutual funds, retirement plans, and exemptions. NEVER ask two questions from the same subtopic in a row.
+
 ${quizFormat}`;
   } else if (lowerNoSpace.includes('series7') || lower.includes('series 7')) {
     system = `You are a Series 7 exam prep tutor covering equity/debt securities, options, mutual funds, municipal securities, retirement plans, and margin accounts.
+
+ROTATION RULE: You MUST rotate through ALL these subtopics evenly: equity securities, debt securities, options strategies, mutual funds, municipal securities, retirement plans, margin accounts, underwriting, and regulations. NEVER ask two questions from the same subtopic in a row.
 
 ${quizFormat}`;
   } else if (lower.includes('sat')) {
     system = `You are an SAT prep tutor covering math, reading, and writing.
 
+ROTATION RULE: Rotate between math, reading, and writing every question. Math subtopics: algebra, geometry, data analysis, advanced math. Reading: literature, history, science passages. Writing: grammar, punctuation, style. NEVER repeat the same concept twice.
+
 ${quizFormat}`;
   } else if (lower.includes('math')) {
     system = `You are a math tutor for Irvine High School covering algebra, geometry, precalculus, and calculus.
 
+ROTATION RULE: Rotate between algebra, geometry, precalculus, and calculus. Each question must be a different subtopic. Use different numbers, equations, and problem types every time. NEVER reuse the same equation or problem structure.
+
 ${quizFormat}`;
   } else if (lower.includes('rn') || lower.includes('nursing') || lower.includes('nclex')) {
     system = `You are an NCLEX-RN exam prep tutor covering pharmacology, anatomy, physiology, and nursing practices.
+
+ROTATION RULE: Rotate through pharmacology, anatomy, physiology, nursing practices, and patient safety. NEVER ask two pharmacology questions in a row. Change the drug names, conditions, and scenarios every question.
 
 ${quizFormat}`;
   } else if (lower.includes('grade9') || lower.includes('freshman')) {
