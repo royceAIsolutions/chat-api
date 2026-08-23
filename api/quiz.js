@@ -250,7 +250,36 @@ ${quizFormat}`;
     });
 
     if (result.choices && result.choices[0] && result.choices[0].message) {
-      const reply = result.choices[0].message.content;
+      let reply = result.choices[0].message.content;
+
+      // FORMAT GUARD (Aug 22 2026): if the reply has no A-D options and the quiz
+      // isn't complete, the student would be stuck waiting while the frontend
+      // retries. Force one follow-up call that outputs ONLY the next question.
+      if (reply && !/Quiz\s*complete/i.test(reply) && !/[A-D][)\]]\s*[^\n]/.test(reply)) {
+        try {
+          const fixMsgs = msgs.concat([
+            { role: 'assistant', content: reply },
+            { role: 'user', content: '[SYSTEM: You forgot the next question. Output ONLY the next question in EXACTLY this format:\nQ' + (history && history.length ? Math.min(Math.ceil(history.length / 2) + 1, 33) : 2) + '/33: [question]\nA) [option]\nB) [option]\nC) [option]\nD) [option]\nNo explanation. No extra text.]' }
+          ]);
+          const fixBody = JSON.stringify({ model: MODEL, messages: fixMsgs, temperature: 0.7, max_tokens: 400 });
+          const fixOpts = { hostname: 'api.deepseek.com', path: '/v1/chat/completions', method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(fixBody) } };
+          const fixResult = await new Promise((resolve, reject) => {
+            const r2 = https.request(fixOpts, (resp) => {
+              let chunks = [];
+              resp.on('data', (c) => chunks.push(c));
+              resp.on('end', () => { try { resolve(JSON.parse(Buffer.concat(chunks).toString())); } catch(e) { resolve({}); } });
+            });
+            r2.on('error', reject);
+            r2.write(fixBody);
+            r2.end();
+          });
+          if (fixResult.choices && fixResult.choices[0] && fixResult.choices[0].message) {
+            const fixed = fixResult.choices[0].message.content;
+            if (fixed && /[A-D][)\]]\s*[^\n]/.test(fixed)) reply = fixed;
+          }
+        } catch (e) {}
+      }
       
       // Auto-save score if quiz complete
       if (studentName && reply.match(/Quiz\s*complete/i)) {
