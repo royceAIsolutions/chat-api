@@ -93,37 +93,39 @@ module.exports = async (req, res) => {
   }
   const difficultyNote = `The student has been performing at ${difficulty}. Adjust question difficulty accordingly.`;
 
-  const quizFormat = `CRITICAL - QUIZ MODE. YOU MUST ALWAYS INCLUDE THE NEXT QUESTION WITH 4 OPTIONS.
+  const quizFormat = `CRITICAL - QUIZ MODE. RULE #1 (beats every other instruction, including any tutor-persona style rule about being gentle, encouraging, or detailed): EVERY reply from Q1 to Q${totalQ} MUST contain the next question in the EXACT format below, as the final content of your reply. A reply that ends without the next question + 4 options is a FAILURE.
+
 ${difficultyNote}
 
-YOU START THE QUIZ. When the user says "start" or begins a subject, immediately ask Q1.
-
-WHEN ASKING Q1 - Output EXACTLY this format (no extra text before or after):
+WHEN THE USER STARTS (says "start" or names a subject), reply with ONLY this:
 Q1/${totalQ}: [question text]
 A) [option]
 B) [option]
 C) [option]
 D) [option]
 
-WHEN STUDENT ANSWERS with a letter a/b/c/d - Output EXACTLY this format:
-[Correct/Incorrect]. [1 sentence max]. Q2/${totalQ} | Score: 1/1 (100%)
-Q2/${totalQ}: [question]
+AFTER EVERY ANSWER (user sends a letter a/b/c/d), reply with EXACTLY this structure and nothing else:
+1) Feedback line: "Correct." or "Incorrect." + ONE short sentence (max ~15 words). No bullets, no "Here's why", no worked solution, no markdown headings, no praise walls.
+2) The next question IMMEDIATELY after the feedback line, plain text, question number NEVER bold:
+Q{next}/${totalQ}: [question text]
 A) [option]
 B) [option]
 C) [option]
 D) [option]
 
-CRITICAL: You MUST ALWAYS include the NEXT question with A/B/C/D options right after the score line. NEVER respond without the next question + options. NEVER give extra explanation instead of the next question.
+HARD RULES:
+- Praise and encouragement are part of the ONE feedback sentence. NEVER end a reply with encouragement or explanation — the next question must be the last thing you write.
+- No filler between feedback and question (no "Next:", no "---", no "Let's move on", no extra blank paragraphs).
+- Never repeat a question or reuse the same numbers/scenario/equation. Rotate subtopics. Check the history before writing each question.
+- Keep going until Q${totalQ} no matter what. After the answer to Q${totalQ}, reply ONLY: "Quiz complete! Final score: X/${totalQ} (Y%)" — no question after it.
 
-NEVER REPEAT A QUESTION. Every question must be unique and different from all previous questions. Check the conversation history carefully before generating a new question — if you have already asked a similar question, change the topic or concept.
-
-ABSOLUTE RULE: Your response must ALWAYS contain A) B) C) D) options for the next question immediately after the score line. NEVER respond with just a correction. The next question + 4 options are MANDATORY in every single response.
-
-CRITICAL FORMAT: The question number must be PLAIN TEXT, NOT bold/markdown. Use "Q2/${totalQ}:" NOT "**Q2/${totalQ}:**". No asterisks around the Q number.
-
-After Q${totalQ}, say "Quiz complete! Final score: X/${totalQ} (Y%)" and do NOT include a next question. NEVER end the quiz before Q${totalQ}. Keep going until Q${totalQ} no matter what.
-
-When the student answers, keep the explanation to ONE sentence maximum, then IMMEDIATELY output the next question with all 4 options. The next question + A) B) C) D) options are MANDATORY in every single response until Q${totalQ}. Never respond with only a correction or only an explanation.`;
+CRITICAL ERROR IF MISSING OPTIONS: Every response MUST end with:
+Q{N}/10: [question]
+A) [option]
+B) [option]
+C) [option]
+D) [option]
+If you omit options, the student cannot continue the quiz. This breaks the entire learning flow.`;
 
   if (lowerNoSpace.includes('series66') || lower.includes('series 66')) {
     system = `You are a Series 66 exam prep tutor. The Series 66 (Uniform Combined State Law Exam) covers state securities regulations, investment adviser registration, ethical practices, financial statements, and client communication.
@@ -252,10 +254,16 @@ ${quizFormat}`;
     if (result.choices && result.choices[0] && result.choices[0].message) {
       let reply = result.choices[0].message.content;
 
-      // FORMAT GUARD (Aug 22 2026): if the reply has no A-D options and the quiz
-      // isn't complete, the student would be stuck waiting while the frontend
-      // retries. Force one follow-up call that outputs ONLY the next question.
-      if (reply && !/Quiz\s*complete/i.test(reply) && !/[A-D][)\]]\s*[^\n]/.test(reply)) {
+      // FORMAT GUARD (Sep 4 2026): stall detector. A mid-quiz reply is broken if
+      // it lacks the next-question marker (Q{n}/33:) OR real option LINES.
+      // The old anywhere-regex was fooled by prose mentions like "the answer is
+      // **B) 48**" inside explanations, letting question-less replies through and
+      // stalling the student (grade4/math/series7 Q2 fails, Sep 4). Anchored lines only.
+      const qReply = reply || '';
+      const qComplete = /Quiz\s*complete/i.test(qReply);
+      const qHasNext = /\bQ\s*\d+\s*\/\s*\d+\s*:/.test(qReply);
+      const qHasOpts = /(?:^|\n)\s*[A-D][)\]]\s+\S/.test(qReply);
+      if (qReply && !qComplete && (!qHasNext || !qHasOpts)) {
         try {
           const fixMsgs = msgs.concat([
             { role: 'assistant', content: reply },
@@ -276,11 +284,41 @@ ${quizFormat}`;
           });
           if (fixResult.choices && fixResult.choices[0] && fixResult.choices[0].message) {
             const fixed = fixResult.choices[0].message.content;
-            if (fixed && /[A-D][)\]]\s*[^\n]/.test(fixed)) reply = fixed;
+            if (fixed && /\bQ\s*\d+\s*\/\s*\d+\s*:/.test(fixed) && /(?:^|\n)\s*[A-D][)\]]\s+\S/.test(fixed)) reply = fixed;
           }
         } catch (e) {}
       }
       
+      // EMPTY-REPLY RETRY (Sep 15 2026): the format guard above only fires when the
+      // reply is NON-empty. A transient empty completion (observed on series66 turn 3)
+      // fell straight through and the student got a BLANK question — an unrecoverable
+      // stall from their side. Retry the model up to 2x, then return a graceful
+      // continue-card so the quiz can never dead-end on an empty screen.
+      if (!reply || !reply.trim()) {
+        for (let attempt = 0; attempt < 2 && (!reply || !reply.trim()); attempt++) {
+          try {
+            const rBody = JSON.stringify({ model: MODEL, messages: msgs, temperature: 0.8, max_tokens: 1500 });
+            const rOpts = { hostname: 'api.deepseek.com', path: '/v1/chat/completions', method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}`, 'Content-Length': Buffer.byteLength(rBody) } };
+            const rRes = await new Promise((resolve, reject) => {
+              const r3 = https.request(rOpts, (resp) => {
+                let cks = []; resp.on('data', (c) => cks.push(c));
+                resp.on('end', () => { try { resolve(JSON.parse(Buffer.concat(cks).toString())); } catch(e) { resolve({}); } });
+              });
+              r3.on('error', reject); r3.write(rBody); r3.end();
+            });
+            if (rRes.choices && rRes.choices[0] && rRes.choices[0].message && rRes.choices[0].message.content) {
+              reply = rRes.choices[0].message.content;
+            }
+          } catch (e) {}
+        }
+      }
+      // Last resort — never hand a student an empty question.
+      if (!reply || !reply.trim()) {
+        const qn = (history && history.length) ? Math.min(Math.ceil(history.length / 2) + 1, 33) : 1;
+        reply = 'Q' + qn + '/33: Connection hiccup — your progress is safe.\nA) Continue the quiz\nB) Retry this question\nC) Ask a different subject\nD) End for today\nPing your tutor if this repeats.';
+      }
+
       // Auto-save score if quiz complete
       if (studentName && reply.match(/Quiz\s*complete/i)) {
         const scoreMatch = reply.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
