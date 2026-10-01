@@ -1,5 +1,31 @@
 const https = require('https');
 
+// ── DATA INTEGRITY GUARD (Oct 1 2026) ────────────────────────────────────────
+// Monitoring probes (SpeedCheck Probe / AutoFixer Test / HealthCheck Test /
+// QuizVerify Test / Test User) wrote REAL entries into production scores.json
+// ~48x/day. At the 500-entry cap they evicted every real student's history and
+// the dashboard read "No quiz history found" for everyone.
+// Rule: test identities never persist, and only accounts in users.json may write.
+const TEST_ID_RE = /(speedcheck|autofixer|healthcheck|quizverify|^\s*test\s*$|^\s*test user\s*$|^\s*student\s*$)/i;
+function isTestIdentity(name) {
+  return TEST_ID_RE.test(String(name || '').trim());
+}
+// Keep at most `perStudentCap` entries PER STUDENT (ordered by arrival).
+// The old global tail cap let one noisy identity evict everybody else.
+function trimScores(list, perStudentCap) {
+  perStudentCap = perStudentCap || 500;
+  const counts = {};
+  const keep = [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const s = list[i] || {};
+    const nm = String(s.student || '');
+    if (!nm || isTestIdentity(nm)) continue;
+    counts[nm] = (counts[nm] || 0) + 1;
+    if (counts[nm] <= perStudentCap) keep.unshift(s);
+  }
+  return keep;
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -7,7 +33,12 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { student, correct, total, subject } = req.body;
+  const { student, correct, total, subject, dryRun } = req.body;
+  // ── PROBE SANDBOX (Oct 1 2026) ─────────────────────────────────────────────
+  // Monitors must be able to measure real write latency without touching student
+  // data. dryRun=true runs the identical GET+PUT round-trip against a throwaway
+  // ledger (tutor/scores-probe.json) and skips users.json entirely.
+  const SCORES_PATH = dryRun ? '/contents/tutor/scores-probe.json' : '/contents/tutor/scores.json';
   if (!student || correct === undefined || !total) return res.json({ error: 'Missing fields' });
 
   const pct = Math.round(correct / total * 100);
@@ -15,7 +46,18 @@ module.exports = async (req, res) => {
   const token = process.env.GH_TOKEN;
   if (!token) return res.json({ error: 'No GitHub token' });
 
+  // Abandoned-quiz guard + identity guard apply to REAL writes only.
+  if (!dryRun) {
+    if (!total || total < 3) {
+      return res.json({ saved: false, rejected: 'tiny/zero score - probe or abandoned quiz' });
+    }
+    if (isTestIdentity(student)) {
+      return res.json({ saved: false, rejected: 'test identity - probes must never write production scores' });
+    }
+  }
+
   const entry = { student, correct, total, percent: pct, subject: subject || 'quiz', date: today, ts: Date.now() };
+  const CAP = dryRun ? 50 : 500;
 
   function gh(method, path, body) {
     return new Promise((resolve, reject) => {
@@ -31,18 +73,18 @@ module.exports = async (req, res) => {
 
   try {
     // Append to scores.json
-    const existing = await gh('GET', '/contents/tutor/scores.json');
+    const existing = await gh('GET', SCORES_PATH);
     let scores = [];
     if (existing.content) {
       scores = JSON.parse(Buffer.from(existing.content, 'base64').toString());
     }
     scores.push(entry);
-    let trimmed = scores.slice(-500);
+    let trimmed = dryRun ? scores.slice(-CAP) : trimScores(scores);
     let newContent = Buffer.from(JSON.stringify(trimmed, null, 2)).toString('base64');
     // Retry up to 3 times on SHA conflict
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        await gh('PUT', '/contents/tutor/scores.json', {
+        await gh('PUT', SCORES_PATH, {
           message: `Quiz: ${student} ${correct}/${total} (${pct}%)`,
           content: newContent,
           sha: existing.sha
@@ -51,14 +93,16 @@ module.exports = async (req, res) => {
       } catch (e) {
         if (attempt === 2) throw e; // last attempt, let it fail
         // Re-fetch to get fresh SHA, re-append
-        const refetch = await gh('GET', '/contents/tutor/scores.json');
+        const refetch = await gh('GET', SCORES_PATH);
         existing.sha = refetch.sha;
         let fresh = JSON.parse(Buffer.from(refetch.content, 'base64').toString());
         fresh.push(entry);
-        trimmed = fresh.slice(-500);
+        trimmed = dryRun ? fresh.slice(-CAP) : trimScores(fresh);
         newContent = Buffer.from(JSON.stringify(trimmed, null, 2)).toString('base64');
       }
     }
+
+    if (dryRun) return res.json({ probe: true, wrote: SCORES_PATH, student, correct, total });
 
     // Also update users.json with fresh stats so dashboard auto-updates
     const usersResp = await gh('GET', '/contents/tutor/users.json');
