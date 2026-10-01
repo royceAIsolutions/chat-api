@@ -1,4 +1,30 @@
 const https = require('https');
+
+// ── DATA INTEGRITY GUARD (Oct 1 2026) ────────────────────────────────────────
+// Monitoring probes (SpeedCheck Probe / AutoFixer Test / HealthCheck Test /
+// QuizVerify Test / Test User) wrote REAL entries into production scores.json
+// ~48x/day. At the 500-entry cap they evicted every real student's history and
+// the dashboard read "No quiz history found" for everyone.
+// Rule: test identities never persist, and only accounts in users.json may write.
+const TEST_ID_RE = /(speedcheck|autofixer|healthcheck|quizverify|^\s*test\s*$|^\s*test user\s*$|^\s*student\s*$)/i;
+function isTestIdentity(name) {
+  return TEST_ID_RE.test(String(name || '').trim());
+}
+// Keep at most `perStudentCap` entries PER STUDENT (ordered by arrival).
+// The old global tail cap let one noisy identity evict everybody else.
+function trimScores(list, perStudentCap) {
+  perStudentCap = perStudentCap || 500;
+  const counts = {};
+  const keep = [];
+  for (let i = list.length - 1; i >= 0; i--) {
+    const s = list[i] || {};
+    const nm = String(s.student || '');
+    if (!nm || isTestIdentity(nm)) continue;
+    counts[nm] = (counts[nm] || 0) + 1;
+    if (counts[nm] <= perStudentCap) keep.unshift(s);
+  }
+  return keep;
+}
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
 // GitHub API helper for saving scores (same pattern as save-score.js)
@@ -17,6 +43,10 @@ function gh(method, path, body, token) {
 async function saveQuizScore(student, correct, total, subject) {
   const token = process.env.GH_TOKEN;
   if (!token) return;
+  // DATA INTEGRITY GUARD (Oct 1 2026): never persist test identities.
+  if (isTestIdentity(student)) return;
+  // Abandoned-quiz guard: 1-2 question scores are probes, never real results.
+  if (!total || total < 3) return;
   const today = new Date().toISOString().slice(0, 10);
   const pct = Math.round(correct / total * 100);
   const entry = { student, correct, total, percent: pct, subject: subject || 'quiz', date: today, ts: Date.now() };
@@ -25,7 +55,7 @@ async function saveQuizScore(student, correct, total, subject) {
     let scores = [];
     if (existing.content) scores = JSON.parse(Buffer.from(existing.content, 'base64').toString());
     scores.push(entry);
-    const trimmed = scores.slice(-500);
+    const trimmed = trimScores(scores);
     const newContent = Buffer.from(JSON.stringify(trimmed, null, 2)).toString('base64');
     await gh('PUT', '/contents/tutor/scores.json', { message: `Quiz: ${student} ${correct}/${total} (${pct}%)`, content: newContent, sha: existing.sha }, token);
     
