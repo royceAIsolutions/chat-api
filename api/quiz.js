@@ -92,14 +92,14 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { message, history, student: studentName, subject } = req.body;
+  const { message, history, student: studentName, subject: reqSubject } = req.body;
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey) return res.json({ reply: 'API key not configured.' });
   if (!message) return res.json({ reply: 'No message provided.' });
 
   // If subject provided (from frontend), use it for system prompt matching
-  const matchSource = subject ? subject.toLowerCase() : message.toLowerCase();
+  const matchSource = reqSubject ? reqSubject.toLowerCase() : message.toLowerCase();
   const lower = matchSource;
   const lowerNoSpace = lower.replace(/\s+/g, '');
   let system = 'You are RoyceAI, an AI tutor. Be helpful and concise.';
@@ -222,6 +222,46 @@ ${quizFormat}`;
 ROTATION RULE: You MUST rotate through ALL these subtopics evenly: real estate law (RCW/WAC), agency relationships, contracts, property ownership & estates, financing/mortgages, appraisal & valuation, land use & zoning, fair housing (FHA), property management, and Washington-specific rules (earnest money, closing, trust accounts). NEVER ask two questions from the same subtopic in a row.
 
 STYLE: Multiple-choice exam questions like the actual WA state exam. Include Washington-specific legal concepts (e.g., RCW 18.85 real estate broker act, escrow rules, agency disclosure requirements). Keep questions concise and directly test exam knowledge.
+
+${quizFormat}`;
+  } else if (lowerNoSpace.includes('apeng') || lower.includes('ap english') || lower.includes('ap lang')) {
+    system = `You are an AP English Language and Composition tutor for an 11th grader preparing for the AP exam and a class grade repair.
+
+COVERAGE: rhetorical analysis (SOAPStone, appeals, claims vs. evidence, line of reasoning, tone, syntax, diction), argument essay (defend / challenge / qualify a position), synthesis (using and citing provided sources), passage-based multiple choice, and style devices (metaphor, juxtaposition, anaphora, parallelism, hyperbole, understatement).
+
+STYLE: Write real AP-style stem questions — either a short passage with an analysis question ("In the sentence ..., the metaphor primarily emphasizes ...") or a composition decision question. Each question must test reasoning the exam actually rewards, not trivia definitions.
+
+ROTATION RULE: Cycle rhetorical analysis → argument → synthesis → multiple choice skills. NEVER ask two questions from the same skill in a row.
+
+${quizFormat}`;
+  } else if (lowerNoSpace.includes('apbio') || lower.includes('ap biology') || lower.includes('ap bio')) {
+    system = `You are an AP Biology tutor for an 11th grader preparing for the AP exam and a class grade repair (D currently, lever = unit tests).
+
+COVERAGE: chemistry of life, cell structure and transport, cellular energetics (glycolysis, Krebs, oxidative phosphorylation, photosynthesis), cell communication and signal transduction, cell cycle and mitosis/meiosis, heredity and gene expression, natural selection and evolution, ecology, and experimental design with data analysis.
+
+STYLE: AP-style questions — model-based and data-based stems, "which of the following best explains", cause-and-effect about specific molecules and organelles. Include the biology vocabulary the teacher tests (receptor, ligand, feedback, transcription, allele) rather than generic science filler.
+
+ROTATION RULE: Cycle through the units above. NEVER ask two questions from the same unit in a row.
+
+${quizFormat}`;
+  } else if (lowerNoSpace.includes('ushist') || lower.includes('us history') || lower.includes('u.s. history')) {
+    system = `You are an AP United States History tutor for an 11th grader.
+
+COVERAGE: Period 1–9 — colonial era and Revolution, Constitution and early republic, market revolution and reform, sectional crisis, Civil War and Reconstruction, Gilded Age and industrialization, Progressivism, imperialism, WWI, the 1920s, Depression and New Deal, WWII, Cold War and civil rights, and post-1980 politics.
+
+STYLE: AP-style questions: identify causation, continuity and change, comparison, and interpretation of historical evidence. Stems should name specific events, acts, amendments, or figures where the teacher would test them.
+
+ROTATION RULE: Move chronologically forward through the periods, then restart. NEVER ask two questions from the same era in a row.
+
+${quizFormat}`;
+  } else if (lower.includes('physics')) {
+    system = `You are a physics tutor for an 11th grader in a first-year (algebra-based) physics course.
+
+COVERAGE: kinematics (distance, displacement, speed, velocity, acceleration), Newton's laws and free-body reasoning, work, energy and power, momentum and collisions, circular motion and gravitation, waves and sound, light and optics, electric charge and circuits, magnetism, and thermodynamics.
+
+STYLE: Mix conceptual questions with short quantitative ones — always give numbers with units and make exactly one option correct under standard formulas (v = d/t, F = ma, KE = ½mv², W = Fd, p = mv). Keep arithmetic clean enough to do without a calculator.
+
+ROTATION RULE: Cycle the topics above. NEVER ask two kinematics or two calculation questions in a row.
 
 ${quizFormat}`;
   }
@@ -356,14 +396,18 @@ ${quizFormat}`;
           const correct = parseInt(scoreMatch[1]);
           const total = parseInt(scoreMatch[2]);
           const pct = Math.round(correct / total * 100);
-          // Determine subject from history
-          let subject = 'quiz';
-          if (history && Array.isArray(history)) {
+          // Determine subject from the request (frontend already knows the deck) or history
+          let subject = (typeof reqSubject === 'string' && reqSubject.trim()) ? reqSubject.trim() : 'quiz';
+          if (subject === 'quiz' && history && Array.isArray(history)) {
             const firstMsg = history.find(m => m.role === 'user');
             if (firstMsg) {
               const t = firstMsg.content.toLowerCase();
               if (t.includes('series66') || t.includes('series 66')) subject = 'series66';
               else if (t.includes('series7') || t.includes('series 7')) subject = 'series7';
+              else if (t.includes('apeng') || t.includes('ap english') || t.includes('ap lang')) subject = 'apeng';
+              else if (t.includes('apbio') || t.includes('ap biology')) subject = 'apbio';
+              else if (t.includes('ushist') || t.includes('us history')) subject = 'ushist';
+              else if (t.includes('physics')) subject = 'physics';
               else if (t.includes('sat')) subject = 'sat';
               else if (t.includes('math')) subject = 'math';
               else if (t.includes('rn') || t.includes('nursing') || t.includes('nclex')) subject = 'rn';
