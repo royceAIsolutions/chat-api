@@ -33,7 +33,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { student, correct, total, subject, dryRun } = req.body;
+  const { student, correct, total, subject, dryRun, src, run } = req.body;
   // ── PROBE SANDBOX (Oct 1 2026) ─────────────────────────────────────────────
   // Monitors must be able to measure real write latency without touching student
   // data. dryRun=true runs the identical GET+PUT round-trip against a throwaway
@@ -56,7 +56,16 @@ module.exports = async (req, res) => {
     }
   }
 
+  // ── IDEMPOTENCY (Nov 4 2026) ───────────────────────────────────────────────
+  // Off-channel drills (Discord, backfills) retry on flaky networks and a cron
+  // reconciler re-pushes anything it thinks is missing. Without a stable key a
+  // retry doubles the entry and skews MTD/YTD. `run` is that key: same
+  // student+run never appends twice, and `src` records which client wrote it.
+  const runId = run ? String(run).trim().slice(0, 64) : null;
+  const srcTag = src ? String(src).trim().slice(0, 24) : 'web';
   const entry = { student, correct, total, percent: pct, subject: subject || 'quiz', date: today, ts: Date.now() };
+  if (runId) entry.run = runId;
+  entry.src = srcTag;
   const CAP = dryRun ? 50 : 500;
 
   function gh(method, path, body) {
@@ -78,6 +87,11 @@ module.exports = async (req, res) => {
     if (existing.content) {
       scores = JSON.parse(Buffer.from(existing.content, 'base64').toString());
     }
+    // Idempotency: one entry per student+run, no matter how many retries land.
+    const seen = () => scores.some(s => s && s.run && s.run === runId && String(s.student) === String(student));
+    if (runId && seen()) {
+      return res.json({ saved: false, deduped: true, run: runId, student, correct, total, percent: pct });
+    }
     scores.push(entry);
     let trimmed = dryRun ? scores.slice(-CAP) : trimScores(scores);
     let newContent = Buffer.from(JSON.stringify(trimmed, null, 2)).toString('base64');
@@ -96,6 +110,10 @@ module.exports = async (req, res) => {
         const refetch = await gh('GET', SCORES_PATH);
         existing.sha = refetch.sha;
         let fresh = JSON.parse(Buffer.from(refetch.content, 'base64').toString());
+        // A concurrent retry of the same run may have already landed.
+        if (runId && fresh.some(s => s && s.run === runId && String(s.student) === String(student))) {
+          return res.json({ saved: false, deduped: true, run: runId, student, correct, total, percent: pct });
+        }
         fresh.push(entry);
         trimmed = dryRun ? fresh.slice(-CAP) : trimScores(fresh);
         newContent = Buffer.from(JSON.stringify(trimmed, null, 2)).toString('base64');
