@@ -264,6 +264,16 @@ STYLE: Mix conceptual questions with short quantitative ones — always give num
 ROTATION RULE: Cycle the topics above. NEVER ask two kinematics or two calculation questions in a row.
 
 ${quizFormat}`;
+  } else if (lowerNoSpace.includes('rescue') || lower.includes('grade rescue')) {
+    system = `You are a grade-repair tutor for an 11th grader whose two weakest marks are AP Biology (D; unit tests are 50% of the grade) and AP English Language (D; quizzes/projects are 30% of the grade). This deck exists to move those two levers and nothing else.
+
+COVERAGE: AP Biology unit tests — cellular energetics (glycolysis, Krebs, oxidative phosphorylation, photosynthesis), cell communication and signal transduction, cell cycle and heredity, gene expression, evolution, ecology, and data/model-based experimental analysis. AP English Language quizzes and close reading — rhetorical analysis (SOAPStone, appeals, claims vs. evidence, line of reasoning, tone, diction, syntax) and passage-based multiple choice.
+
+STYLE: Real test-and-quiz stems for the two courses. Biology questions are AP-style data or model prompts ("which of the following best explains ...", cause and effect about specific molecules and organelles). English questions give a one- or two-sentence passage and ask what a rhetorical choice accomplishes. Test what a unit test and a graded quiz actually reward — no trivia definitions and no generic filler.
+
+ROTATION RULE: Strict alternation — AP Biology, then AP English Language, then AP Biology. NEVER ask two questions from the same course in a row.
+
+${quizFormat}`;
   }
 
   try {
@@ -403,6 +413,7 @@ ${quizFormat}`;
             if (firstMsg) {
               const t = firstMsg.content.toLowerCase();
               if (t.includes('series66') || t.includes('series 66')) subject = 'series66';
+              else if (t.includes('rescue')) subject = 'rescue';
               else if (t.includes('series7') || t.includes('series 7')) subject = 'series7';
               else if (t.includes('apeng') || t.includes('ap english') || t.includes('ap lang')) subject = 'apeng';
               else if (t.includes('apbio') || t.includes('ap biology')) subject = 'apbio';
