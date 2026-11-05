@@ -200,6 +200,73 @@ module.exports = async (req, res) => {
   }
   const difficultyNote = `The student has been performing at ${difficulty}. Adjust question difficulty accordingly.`;
 
+  // ── MATH LEVEL (Nov 4 2026) ─────────────────────────────────────────────────
+  // One shared `math` deck was serving a single high-school curriculum to every
+  // student, so a 2nd grader got algebra and an Algebra 2 student got middle-school
+  // arithmetic. The dashboard now sends the roster's difficulty line as `level`
+  // (e.g. "📚 Grade 2 — Foundations", "🔥 Math 3 — 94%", "📚 11th Grade — AP course load");
+  // we bucket it here. No level ⇒ the generic HS deck, so old callers behave as before.
+  function mathLevelFrom(raw) {
+    const l = String(raw || '').toLowerCase();
+    if (!l) return '';
+    if (/pre-?\s*algebra/.test(l)) return 'prealg';
+    if (/calculus/.test(l)) return 'calc';
+    if (/pre-?\s*calc/.test(l)) return 'precalc';
+    if (/algebra\s*(2|ii)\b|integrated\s*(math\s*)?(2|ii)\b|math\s*(2|ii)\b/.test(l)) return 'alg2';
+    if (/math\s*3\b|integrated\s*(math\s*)?3\b/.test(l)) return 'math3';
+    if (/algebra\s*(1|i)\b|integrated\s*(math\s*)?1\b|math\s*1\b/.test(l)) return 'alg1';
+    const g = l.match(/grade\s*(\d{1,2})/) || l.match(/(\d{1,2})\s*(?:st|nd|rd|th)?\s*grade/);
+    if (g) {
+      const n = parseInt(g[1], 10);
+      if (n <= 3) return 'elementary';
+      if (n <= 5) return 'grade45';
+      if (n <= 8) return 'prealg';
+      if (n === 9) return 'alg1';
+      if (n <= 11) return 'alg2';
+      return 'precalc';
+    }
+    return '';
+  }
+  const mathLevel = mathLevelFrom(req.body && req.body.level);
+  // Bodies only — quizFormat is interpolated in the `math` branch, which runs after it is defined.
+  const mathDeck = (body) => body;
+  const MATH_DECKS = {
+    elementary: mathDeck(`You are a math tutor for a 2nd–3rd grade student. Keep every question small, concrete and encouraging.
+COVERAGE: addition and subtraction within 100, place value (ones/tens/hundreds), skip counting, multiplication tables up to 10, simple division, halves and quarters, money, telling time, shapes and simple perimeter, one-step word problems.
+STYLE: Short sentences, friendly wording, small whole numbers. Keep every sum and difference within 100. NO algebra, NO decimals, NO multi-step problems, NO negatives.
+ROTATION RULE: Rotate addition/subtraction → place value → multiplication → division → fractions/money/time → word problems. NEVER two questions of the same kind in a row.`),
+    grade45: mathDeck(`You are a math tutor for a 4th–5th grade student.
+COVERAGE: multi-digit multiplication and long division, fractions (equivalent, add/subtract, compare), decimals to hundredths, place value, order of operations, area and perimeter, unit conversion, percentages of a whole, simple data/graph reading, two-step word problems.
+STYLE: Grade-level numbers a 9–11 year old can handle without a calculator. NO algebra, NO negative numbers, NO trigonometry.
+ROTATION RULE: Rotate arithmetic → fractions/decimals → geometry/measurement → data → word problems. NEVER repeat a subtopic twice in a row.`),
+    prealg: mathDeck(`You are a pre-algebra tutor for a middle-school student (grades 6–8).
+COVERAGE: integers and absolute value, order of operations, factors/multiples, ratios, rates and proportions, percentages (discount, tax, tip), one- and two-step equations, inequalities, exponent rules, square roots, the coordinate plane, slope as rate of change, simple probability.
+STYLE: Middle-school stems with clean integer answers. Show one quantity per sentence — no compound trick questions. NO quadratics, NO logarithms, NO trigonometry.
+ROTATION RULE: Rotate integers/order of ops → ratios/percent → equations/inequalities → exponents/roots → coordinate plane/slope → probability. NEVER two equation-solving questions in a row.`),
+    alg1: mathDeck(`You are an Algebra 1 / Integrated Math I tutor for a 9th grade student.
+COVERAGE: linear equations and inequalities, slope and forms of a line, systems of equations (graphing, substitution, elimination), exponent rules, polynomial addition/multiplication, factoring (GCF, difference of squares, trinomials), quadratic equations by factoring, functions and domain/range, scatterplots and lines of best fit.
+STYLE: Standard Algebra 1 stems with exactly one correct answer under the usual procedure. Keep arithmetic clean. Avoid logarithms, complex numbers, and calculus.
+ROTATION RULE: Rotate linear → systems → exponents/polynomials → factoring/quadratics → functions. NEVER two linear-equation solves in a row.`),
+    alg2: mathDeck(`You are an Algebra 2 / Integrated Math II tutor for an 11th grader whose current course is Math II (quadratics, polynomials, functions, and right-triangle trigonometry).
+COVERAGE: quadratic functions (vertex, axis of symmetry, discriminant, roots by factoring/quadratic formula), polynomial functions and end behavior, factoring including sum/difference of cubes, rational expressions and equations, exponent and logarithm rules, exponential growth/decay, sequences and series (arithmetic, geometric), systems of equations in two and three variables, function transformations, inverse functions, right-triangle trigonometry (sine/cosine/tangent, special angles), circles (arcs, chords, inscribed angles), and basic probability/statistics.
+STYLE: Math II / Algebra 2 stems — manipulate expressions and reason about graphs, exactly one correct option, clean numbers. This is a student earning an A, so the questions should be genuinely course-level, not arithmetic review. NO precalculus topics (limits, vectors, polar, conic sections) and NO calculus.
+ROTATION RULE: Rotate quadratics → polynomials/factoring → rational/exponential/log → sequences/systems → functions/transformations → trigonometry → circles/probability. NEVER two questions from the same strand in a row.`),
+    math3: mathDeck(`You are an Integrated Math III / Precalculus tutor for a high-school student.
+COVERAGE: polynomial, rational, exponential, logarithmic and trigonometric functions; log properties; trig identities and the unit circle; sequences and series; conics; matrices and systems; vectors; an introduction to limits.
+STYLE: Honors-level stems, exactly one correct option. Keep arithmetic tractable. NO formal derivatives or integrals beyond a conceptual limit question.
+DEPTH FLOOR: do not ask one-step function evaluation (f(4) on a line), basic slope, or single-step linear equations — that is Algebra 1 work. Every question must require polynomial, rational, exponential, log, trig, conic, sequence, matrix or vector reasoning.
+ROTATION RULE: Rotate functions → trigonometry → sequences/conics → matrices/vectors → limits. NEVER two questions from the same strand in a row.`),
+    precalc: mathDeck(`You are a precalculus tutor for a high-school senior.
+COVERAGE: function analysis and transformations, polynomial and rational functions, exponential and logarithmic functions, trigonometric functions and identities, the unit circle, conic sections, vectors, sequences and series, matrices, and limits as preparation for calculus.
+STYLE: Precalculus stems with exactly one correct answer. Keep arithmetic clean. NO derivatives or integrals.
+ROTATION RULE: Rotate functions → exponentials/logs → trigonometry → conics/vectors → limits. NEVER two questions from the same strand in a row.`),
+    calc: mathDeck(`You are an introductory calculus tutor for a high-school or first-year college student.
+COVERAGE: limits and continuity, the definition of the derivative, derivative rules (power, product, quotient, chain), applications (tangent lines, rates of change, optimization, curve sketching), antiderivatives, definite integrals and area.
+STYLE: Calculus stems with exactly one correct answer under standard rules. Keep algebra light so the calculus is what is being tested.
+ROTATION RULE: Rotate limits → derivative rules → derivative applications → integration → area between curves. NEVER two derivative computations in a row.`),
+  };
+
+
   const quizFormat = `CRITICAL - QUIZ MODE. RULE #1 (beats every other instruction, including any tutor-persona style rule about being gentle, encouraging, or detailed): EVERY reply from Q1 to Q${totalQ} MUST contain the next question in the EXACT format below, as the final content of your reply. A reply that ends without the next question + 4 options is a FAILURE.
 
 ${difficultyNote}
@@ -253,11 +320,10 @@ ROTATION RULE: Rotate between math, reading, and writing every question. Math su
 
 ${quizFormat}`;
   } else if (lower.includes('math')) {
-    system = `You are a math tutor for Irvine High School covering algebra, geometry, precalculus, and calculus.
+    const genericMath = `You are a math tutor for Irvine High School covering algebra, geometry, precalculus, and calculus.
 
-ROTATION RULE: Rotate between algebra, geometry, precalculus, and calculus. Each question must be a different subtopic. Use different numbers, equations, and problem types every time. NEVER reuse the same equation or problem structure.
-
-${quizFormat}`;
+ROTATION RULE: Rotate between algebra, geometry, precalculus, and calculus. Each question must be a different subtopic. Use different numbers, equations, and problem types every time. NEVER reuse the same equation or problem structure.`;
+    system = `${MATH_DECKS[mathLevel] || genericMath}\n\nSCOPE: every question in this quiz is a math question. Never ask science, English, or history questions, even as a "change of pace".\n\n${quizFormat}`;
   } else if (lower.includes('rn') || lower.includes('nursing') || lower.includes('nclex')) {
     system = `You are an NCLEX-RN exam prep tutor covering pharmacology, anatomy, physiology, and nursing practices.
 
