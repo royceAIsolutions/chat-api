@@ -1,5 +1,46 @@
 const https = require('https');
 
+// ── AUTHORED DRILL BANKS ─────────────────────────────────────────────────────
+// Fixed, keyed question sets graded deterministically — no model call, so no
+// invented stems, no subject drift and no 30s timeout on a 33-question drill.
+// Files live under api/_banks/ so Vercel does not expose them as routes.
+const DRILL_BANKS = { rescue: require('./_banks/rescue') };
+
+function drillReply(bank, history, message) {
+  const qs = bank.questions;
+  const total = qs.length;
+  const hist = Array.isArray(history) ? history : [];
+  const scored = hist.filter(m => m.role === 'assistant' && /^Correct/i.test(String(m.content || '')));
+  let answered = 0;
+  for (const m of hist) {
+    if (m.role !== 'assistant') continue;
+    const hit = String(m.content || '').match(/Q(\d+)\s*\/\s*(\d+)/);
+    if (hit && Number(hit[1]) > answered) answered = Number(hit[1]);
+  }
+  const fmtQ = (i) => {
+    const q = qs[i];
+    return `Q${q.n}/${total}: ${q.stem}\n` +
+      q.options.map((o, j) => `${'ABCD'[j]}) ${o}`).join('\n');
+  };
+  if (!answered) return { reply: fmtQ(0) };
+
+  const q = qs[answered - 1];
+  const letter = (String(message || '').toUpperCase().match(/(?:^|[^A-Z])([ABCD])(?:[^A-Z]|$)/) || [])[1];
+  if (!letter) return { reply: `Please answer with a single letter — A, B, C or D.\n\n${fmtQ(answered - 1)}` };
+
+  const right = letter === q.answer;
+  const corr = scored.length + (right ? 1 : 0);
+  const head = right
+    ? `Correct. ${q.why}`
+    : `Incorrect. The answer is ${q.answer} — ${q.why}`;
+  const tail = `Score: ${corr}/${answered}`;
+  const next = answered < total
+    ? `\n\n${fmtQ(answered)}`
+    : `\n\nQuiz complete — ${bank.title}, ${corr}/${total} (${Math.round((corr / total) * 100)}%).`;
+  return { reply: `${head}\n${tail}${next}` };
+}
+
+
 // ── DATA INTEGRITY GUARD (Oct 1 2026) ────────────────────────────────────────
 // Monitoring probes (SpeedCheck Probe / AutoFixer Test / HealthCheck Test /
 // QuizVerify Test / Test User) wrote REAL entries into production scores.json
@@ -274,6 +315,12 @@ STYLE: Real test-and-quiz stems for the two courses. Biology questions are AP-st
 ROTATION RULE: Strict alternation — AP Biology, then AP English Language, then AP Biology. NEVER ask two questions from the same course in a row.
 
 ${quizFormat}`;
+  }
+
+  // Authored decks bypass the model: fixed questions, keyed answers, exact score.
+  const bankKey = lowerNoSpace.includes('rescue') ? 'rescue' : null;
+  if (bankKey && DRILL_BANKS[bankKey]) {
+    return res.json(drillReply(DRILL_BANKS[bankKey], history, message));
   }
 
   try {
