@@ -3,8 +3,44 @@ const https = require('https');
 // ── AUTHORED DRILL BANKS ─────────────────────────────────────────────────────
 // Fixed, keyed question sets graded deterministically — no model call, so no
 // invented stems, no subject drift and no 30s timeout on a 33-question drill.
-// Files live under api/_banks/ so Vercel does not expose them as routes.
+// Files live under api/_banks/ so Vercel does not expose them as routes; the
+// BUNDLED copy is only a fallback. The live set is refreshed daily by a cron
+// job that rewrites tutor/drill/<id>.json in the static-site repo, so a fresh
+// bank ships without a Vercel deploy.
 const DRILL_BANKS = { rescue: require('./_banks/rescue') };
+const DRILL_REMOTE = 'https://royceai.com/tutor/drill/';
+const BANK_TTL_MS = 10 * 60 * 1000;
+const bankCache = {}; // id -> { at, bank }
+
+function fetchJson(url, timeoutMs) {
+  return new Promise((resolve) => {
+    const req = https.get(url, { headers: { 'User-Agent': 'royceai-quiz' } }, (r) => {
+      if (r.statusCode !== 200) { r.resume(); return resolve(null); }
+      let body = '';
+      r.setEncoding('utf8');
+      r.on('data', (c) => { body += c; if (body.length > 500000) req.destroy(); });
+      r.on('end', () => { try { resolve(JSON.parse(body)); } catch (e) { resolve(null); } });
+    });
+    req.on('error', () => resolve(null));
+    req.setTimeout(timeoutMs || 2500, () => { req.destroy(); resolve(null); });
+  });
+}
+
+function isBank(b) {
+  return b && Array.isArray(b.questions) && b.questions.length >= 5 &&
+    b.questions.every(q => q && q.stem && q.answer && Array.isArray(q.options) && q.options.length === 4);
+}
+
+async function getBank(id) {
+  const hit = bankCache[id];
+  if (hit && Date.now() - hit.at < BANK_TTL_MS) return hit.bank;
+  const remote = await fetchJson(DRILL_REMOTE + id + '.json');
+  const bank = isBank(remote) ? remote : DRILL_BANKS[id];
+  if (!bank) return null;
+  bankCache[id] = { at: Date.now(), bank };
+  return bank;
+}
+
 
 function drillReply(bank, history, message) {
   const qs = bank.questions;
@@ -318,9 +354,12 @@ ${quizFormat}`;
   }
 
   // Authored decks bypass the model: fixed questions, keyed answers, exact score.
+  // The live set comes from royceai.com/tutor/drill/<id>.json (refreshed daily);
+  // the bundled copy is the offline fallback.
   const bankKey = lowerNoSpace.includes('rescue') ? 'rescue' : null;
-  if (bankKey && DRILL_BANKS[bankKey]) {
-    return res.json(drillReply(DRILL_BANKS[bankKey], history, message));
+  if (bankKey) {
+    const bank = await getBank(bankKey);
+    if (bank) return res.json(drillReply(bank, history, message));
   }
 
   try {
