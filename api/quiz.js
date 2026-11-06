@@ -102,6 +102,39 @@ function trimScores(list, perStudentCap) {
   }
   return keep;
 }
+// ── CURRENT CLASSWORK (grounded in the student's own scans/worksheets) ────────
+// Carter scans homework and worksheets; the useful part is what his teacher is testing this
+// week, not the images. That lives in tutor/drill/coursework.json on the site (per student, per
+// deck) and is appended to the deck prompt so questions land on the current unit instead of a
+// generic tour of the course. Missing file / no entry ⇒ decks behave exactly as before.
+let CW_CACHE = { at: 0, data: null };
+const CW_URL = 'https://royceai.com/tutor/drill/coursework.json';
+
+function fetchJson(url) {
+  return new Promise((resolve) => {
+    https.get(url, { headers: { 'User-Agent': 'royceai-quiz' } }, (resp) => {
+      if (resp.statusCode !== 200) { resp.resume(); return resolve(null); }
+      let raw = '';
+      resp.on('data', (d) => { raw += d; });
+      resp.on('end', () => { try { resolve(JSON.parse(raw)); } catch (e) { resolve(null); } });
+    }).on('error', () => resolve(null));
+  });
+}
+
+async function courseworkFor(studentName, deckKey) {
+  if (!deckKey) return null;
+  const now = Date.now();
+  if (!CW_CACHE.data || now - CW_CACHE.at > 300000) {
+    const data = await fetchJson(CW_URL);
+    if (data) CW_CACHE = { at: now, data };
+  }
+  const entry = CW_CACHE.data && CW_CACHE.data.students && CW_CACHE.data.students[NAME_KEY(studentName)];
+  const cw = entry && entry[deckKey];
+  if (!cw) return null;
+  const focus = Array.isArray(cw.focus) ? cw.focus.join('; ') : '';
+  return `CURRENT CLASSWORK — from this student's own scanned pages and worksheets: ${cw.current}${focus ? ` Prioritize these when they fit the course: ${focus}.` : ''}`;
+}
+
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
 // ── ROSTER LEVEL (server-side truth) ──────────────────────────────────────────
@@ -485,6 +518,19 @@ STYLE: Real test-and-quiz stems for the two courses. Biology questions are AP-st
 ROTATION RULE: Strict alternation — AP Biology, then AP English Language, then AP Biology. NEVER ask two questions from the same course in a row.
 
 ${quizFormat}`;
+  }
+
+  // Which deck did we actually route to? Classwork is keyed per deck.
+  const deckKey = lower.includes('rescue') ? 'rescue'
+    : (lowerNoSpace.includes('apeng') || lower.includes('ap english') || lower.includes('ap lang')) ? 'apeng'
+    : (lowerNoSpace.includes('apbio') || lower.includes('ap biology') || lower.includes('ap bio')) ? 'apbio'
+    : (lowerNoSpace.includes('ushist') || lower.includes('us history')) ? 'ushist'
+    : lower.includes('physics') ? 'physics'
+    : lower.includes('math') ? 'math' : '';
+  const classwork = who.name ? await courseworkFor(who.name, deckKey) : null;
+  if (classwork) {
+    const fmtAt = system.indexOf('CRITICAL - QUIZ MODE');
+    system = fmtAt > 0 ? system.slice(0, fmtAt) + classwork + '\n\n' + system.slice(fmtAt) : system + '\n\n' + classwork;
   }
 
   // Authored decks bypass the model: fixed questions, keyed answers, exact score.
