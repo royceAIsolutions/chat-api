@@ -185,20 +185,37 @@ module.exports = async (req, res) => {
   const totalQ = 33;
   const qLabel = `Q1/${totalQ}`;
   
-  // Difficulty scaling based on history
-  let difficulty = "9th grade level";
+  // ── DIFFICULTY CALIBRATION (Nov 4 2026) ────────────────────────────────────
+  // This used to default to "9th grade level" for every student, and that note is embedded in
+  // quizFormat, so an AP junior's physics and biology decks were being told to aim at 9th grade
+  // — the source of definition-level ("which of these is a vector?") questions. Calibrate to the
+  // deck's own course instead, and only stretch when the history shows evidence: either explicit
+  // "Score: x/y" lines or the dashboard's own Correct/Incorrect turns.
+  let accuracy = null;
   if (history && Array.isArray(history)) {
-    const scoreLines = history.filter(m => m.role === 'assistant' && m.content && m.content.includes('Score:'));
-    const lastScores = scoreLines.slice(-3).map(s => {
-      const m = s.content.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
-      return m ? parseInt(m[1]) / parseInt(m[2]) : 0;
-    });
-    const avg = lastScores.length ? lastScores.reduce((a,b) => a+b, 0) / lastScores.length : 0;
-    if (avg >= 0.95) difficulty = "SAT / AP exam level — maximum difficulty";
-    else if (avg >= 0.80) difficulty = "honors level — harder questions";
-    else if (avg >= 0.60) difficulty = "above grade level";
+    const graded = history.filter(m => m.role === 'assistant' && typeof m.content === 'string');
+    const scoreRatios = [];
+    let correctTurns = 0, gradedTurns = 0;
+    for (const m of graded) {
+      const sm = m.content.match(/Score:\s*(\d+)\s*\/\s*(\d+)/i);
+      if (sm) {
+        const t = parseInt(sm[2], 10);
+        if (t > 0) scoreRatios.push(parseInt(sm[1], 10) / t);
+        continue;
+      }
+      if (/^correct\b/i.test(m.content.trim())) { correctTurns++; gradedTurns++; }
+      else if (/^incorrect\b/i.test(m.content.trim())) { gradedTurns++; }
+    }
+    if (scoreRatios.length) accuracy = scoreRatios.reduce((a, b) => a + b, 0) / scoreRatios.length;
+    else if (gradedTurns >= 3) accuracy = correctTurns / gradedTurns;
   }
-  const difficultyNote = `The student has been performing at ${difficulty}. Adjust question difficulty accordingly.`;
+  let difficulty;
+  if (accuracy === null) difficulty = 'the course level this deck covers — never simplified below it';
+  else if (accuracy >= 0.95) difficulty = 'the top of this course (AP exam / honors depth)';
+  else if (accuracy >= 0.80) difficulty = 'honors depth within this course';
+  else if (accuracy >= 0.50) difficulty = 'the standard course level';
+  else difficulty = 'course level, sequenced from the fundamentals up while they recover accuracy';
+  const difficultyNote = `Target difficulty: ${difficulty}. Every question must be answerable only by someone actually taking this course.`;
 
   // ── MATH LEVEL (Nov 4 2026) ─────────────────────────────────────────────────
   // One shared `math` deck was serving a single high-school curriculum to every
@@ -373,6 +390,7 @@ ${quizFormat}`;
 COVERAGE: rhetorical analysis (SOAPStone, appeals, claims vs. evidence, line of reasoning, tone, syntax, diction), argument essay (defend / challenge / qualify a position), synthesis (using and citing provided sources), passage-based multiple choice, and style devices (metaphor, juxtaposition, anaphora, parallelism, hyperbole, understatement).
 
 STYLE: Write real AP-style stem questions — either a short passage with an analysis question ("In the sentence ..., the metaphor primarily emphasizes ...") or a composition decision question. Each question must test reasoning the exam actually rewards, not trivia definitions.
+DEPTH FLOOR: never a definition question ("what is a metaphor?", "what is a thesis?"). Every question must give a passage, a sentence, or a student draft and ask what a specific choice accomplishes, what the line of reasoning requires, or which revision best serves the argument — AP Language multiple-choice and essay-revision level.
 
 ROTATION RULE: Cycle rhetorical analysis → argument → synthesis → multiple choice skills. NEVER ask two questions from the same skill in a row.
 
@@ -383,6 +401,7 @@ ${quizFormat}`;
 COVERAGE: chemistry of life, cell structure and transport, cellular energetics (glycolysis, Krebs, oxidative phosphorylation, photosynthesis), cell communication and signal transduction, cell cycle and mitosis/meiosis, heredity and gene expression, natural selection and evolution, ecology, and experimental design with data analysis.
 
 STYLE: AP-style questions — model-based and data-based stems, "which of the following best explains", cause-and-effect about specific molecules and organelles. Include the biology vocabulary the teacher tests (receptor, ligand, feedback, transcription, allele) rather than generic science filler.
+DEPTH FLOOR: this is an AP course, so no middle-school recall ("what is the powerhouse of the cell", "which organelle makes proteins"). Every question must require reasoning over a mechanism, a data set, or an experimental result — predict the outcome of a knockout or inhibitor, interpret a graph or gel, explain a signal that fails, or identify the error in a proposed experiment.
 
 ROTATION RULE: Cycle through the units above. NEVER ask two questions from the same unit in a row.
 
@@ -393,6 +412,7 @@ ${quizFormat}`;
 COVERAGE: Period 1–9 — colonial era and Revolution, Constitution and early republic, market revolution and reform, sectional crisis, Civil War and Reconstruction, Gilded Age and industrialization, Progressivism, imperialism, WWI, the 1920s, Depression and New Deal, WWII, Cold War and civil rights, and post-1980 politics.
 
 STYLE: AP-style questions: identify causation, continuity and change, comparison, and interpretation of historical evidence. Stems should name specific events, acts, amendments, or figures where the teacher would test them.
+DEPTH FLOOR: no name-and-date trivia ("who was the first president"). Every question must ask for a cause, a consequence, a comparison across periods, or the best interpretation of a document or set of evidence — AP US History level, not a citizenship quiz.
 
 ROTATION RULE: Move chronologically forward through the periods, then restart. NEVER ask two questions from the same era in a row.
 
@@ -403,6 +423,7 @@ ${quizFormat}`;
 COVERAGE: kinematics (distance, displacement, speed, velocity, acceleration), Newton's laws and free-body reasoning, work, energy and power, momentum and collisions, circular motion and gravitation, waves and sound, light and optics, electric charge and circuits, magnetism, and thermodynamics.
 
 STYLE: Mix conceptual questions with short quantitative ones — always give numbers with units and make exactly one option correct under standard formulas (v = d/t, F = ma, KE = ½mv², W = Fd, p = mv). Keep arithmetic clean enough to do without a calculator.
+DEPTH FLOOR: no definition-recall stems ("which of these is a vector?", "what is the unit of force?"). Every question must require applying a relationship — a two-step calculation (find acceleration, then force), a projectile with both components, energy conservation across two states, Newton's second law with friction, Ohm's law through two resistors, or a wave's frequency/wavelength — the level of an 11th grade college-prep physics course and its unit tests.
 
 ROTATION RULE: Cycle the topics above. NEVER ask two kinematics or two calculation questions in a row.
 
