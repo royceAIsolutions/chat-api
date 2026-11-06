@@ -104,6 +104,49 @@ function trimScores(list, perStudentCap) {
 }
 const MODEL = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
 
+// ── ROSTER LEVEL (server-side truth) ──────────────────────────────────────────
+// The dashboard sends the `level` it logged in with, but a stale cached page, a renamed
+// student or any other client can send the wrong one — and a quiz that drops to another
+// student's grade is a real failure, not a cosmetic one. When the request names a student we
+// look the roster up ourselves (the GitHub copy is production) and that record wins over
+// anything the client sent. Cached per warm instance; 60s is enough to avoid a fetch per turn.
+let ROSTER_CACHE = { at: 0, users: null };
+const NAME_KEY = (s) => String(s || '').toLowerCase().replace(/\s+/g, ' ').trim();
+
+async function rosterList() {
+  const now = Date.now();
+  if (ROSTER_CACHE.users && now - ROSTER_CACHE.at < 60000) return ROSTER_CACHE.users;
+  const token = process.env.GH_TOKEN;
+  if (!token) return ROSTER_CACHE.users || null;
+  try {
+    const r = await gh('GET', '/contents/tutor/users.json', null, token);
+    if (r && r.content) {
+      const users = JSON.parse(Buffer.from(r.content, 'base64').toString());
+      if (Array.isArray(users)) {
+        ROSTER_CACHE = { at: now, users };
+        return users;
+      }
+    }
+  } catch (e) {}
+  return ROSTER_CACHE.users || null;
+}
+
+async function levelFor(studentName, clientLevel) {
+  const key = NAME_KEY(studentName);
+  if (key) {
+    const users = await rosterList();
+    if (Array.isArray(users)) {
+      const rec = users.find(u => NAME_KEY(u.name) === key || NAME_KEY(u.id) === key);
+      if (rec) return { level: rec.difficulty || '', name: rec.name || studentName, source: 'roster' };
+      // Roster is readable and this student is not in it: do NOT trust the caller's level —
+      // that is exactly how one student's grade bleeds into another's quiz.
+      return { level: '', name: studentName, source: 'roster-absent' };
+    }
+  }
+  // Roster unavailable (no token / network): best effort with what the client sent.
+  return { level: String(clientLevel || ''), name: studentName || '', source: 'client' };
+}
+
 // GitHub API helper for saving scores (same pattern as save-score.js)
 function gh(method, path, body, token) {
   return new Promise((resolve, reject) => {
@@ -169,11 +212,14 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { message, history, student: studentName, subject: reqSubject } = req.body;
+  const { message, history, student: studentName, subject: reqSubject, level: clientLevel } = req.body;
   const apiKey = process.env.DEEPSEEK_API_KEY;
 
   if (!apiKey) return res.json({ reply: 'API key not configured.' });
   if (!message) return res.json({ reply: 'No message provided.' });
+
+  // Who is this, really? The roster beats whatever level the caller claimed.
+  const who = await levelFor(studentName, clientLevel);
 
   // If subject provided (from frontend), use it for system prompt matching
   const matchSource = reqSubject ? reqSubject.toLowerCase() : message.toLowerCase();
@@ -214,8 +260,9 @@ module.exports = async (req, res) => {
   else if (accuracy >= 0.95) difficulty = 'the top of this course (AP exam / honors depth)';
   else if (accuracy >= 0.80) difficulty = 'honors depth within this course';
   else if (accuracy >= 0.50) difficulty = 'the standard course level';
-  else difficulty = 'course level, sequenced from the fundamentals up while they recover accuracy';
-  const difficultyNote = `Target difficulty: ${difficulty}. Every question must be answerable only by someone actually taking this course.`;
+  else difficulty = 'course level with cleaner numbers and no trick chains — still course rigor, never below it';
+  const whoLine = who.name ? `${who.name}${who.level ? ' — ' + who.level : ''}` : 'unknown (no roster match)';
+  const difficultyNote = `Student: ${whoLine}. Target difficulty: ${difficulty}. This is a FLOOR, not a target: never ask a question below the student's own course level, and when two questions both fit the coursework, ask the harder one. A question that would be too easy is a failure of the quiz.`;
 
   // ── MATH LEVEL (Nov 4 2026) ─────────────────────────────────────────────────
   // One shared `math` deck was serving a single high-school curriculum to every
@@ -244,7 +291,7 @@ module.exports = async (req, res) => {
     }
     return '';
   }
-  const mathLevel = mathLevelFrom(req.body && req.body.level);
+  const mathLevel = mathLevelFrom(who.level);
   // Bodies only — quizFormat is interpolated in the `math` branch, which runs after it is defined.
   const mathDeck = (body) => body;
   const MATH_DECKS = {
