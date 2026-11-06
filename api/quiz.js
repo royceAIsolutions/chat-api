@@ -83,7 +83,7 @@ function drillReply(bank, history, message) {
 // ~48x/day. At the 500-entry cap they evicted every real student's history and
 // the dashboard read "No quiz history found" for everyone.
 // Rule: test identities never persist, and only accounts in users.json may write.
-const TEST_ID_RE = /(speedcheck|autofixer|healthcheck|quizverify|^\s*test\s*$|^\s*test user\s*$|^\s*student\s*$)/i;
+const TEST_ID_RE = /(speedcheck|autofixer|healthcheck|quizverify|^demo( student)?$|^anonymous$|^\s*test\s*$|^\s*test user\s*$|^\s*student\s*$)/i;
 function isTestIdentity(name) {
   return TEST_ID_RE.test(String(name || '').trim());
 }

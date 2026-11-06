@@ -6,7 +6,7 @@ const https = require('https');
 // ~48x/day. At the 500-entry cap they evicted every real student's history and
 // the dashboard read "No quiz history found" for everyone.
 // Rule: test identities never persist, and only accounts in users.json may write.
-const TEST_ID_RE = /(speedcheck|autofixer|healthcheck|quizverify|^\s*test\s*$|^\s*test user\s*$|^\s*student\s*$)/i;
+const TEST_ID_RE = /(speedcheck|autofixer|healthcheck|quizverify|^demo( student)?$|^anonymous$|^\s*test\s*$|^\s*test user\s*$|^\s*student\s*$)/i;
 function isTestIdentity(name) {
   return TEST_ID_RE.test(String(name || '').trim());
 }
@@ -43,10 +43,10 @@ module.exports = async (req, res) => {
 
   const pct = Math.round(correct / total * 100);
   const today = new Date().toISOString().slice(0, 10);
-  const token = process.env.GH_TOKEN;
-  if (!token) return res.json({ error: 'No GitHub token' });
 
   // Abandoned-quiz guard + identity guard apply to REAL writes only.
+  // These run before the token check so junk identities are rejected even when
+  // credentials are misconfigured (and so the guard is testable without a token).
   if (!dryRun) {
     if (!total || total < 3) {
       return res.json({ saved: false, rejected: 'tiny/zero score - probe or abandoned quiz' });
@@ -55,6 +55,9 @@ module.exports = async (req, res) => {
       return res.json({ saved: false, rejected: 'test identity - probes must never write production scores' });
     }
   }
+
+  const token = process.env.GH_TOKEN;
+  if (!token) return res.json({ error: 'No GitHub token' });
 
   // ── IDEMPOTENCY (Nov 4 2026) ───────────────────────────────────────────────
   // Off-channel drills (Discord, backfills) retry on flaky networks and a cron
