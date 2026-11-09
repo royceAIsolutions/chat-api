@@ -493,7 +493,7 @@ ${quizFormat}`;
 COVERAGE: Period 1–9 — colonial era and Revolution, Constitution and early republic, market revolution and reform, sectional crisis, Civil War and Reconstruction, Gilded Age and industrialization, Progressivism, imperialism, WWI, the 1920s, Depression and New Deal, WWII, Cold War and civil rights, and post-1980 politics.
 
 STYLE: AP-style questions: identify causation, continuity and change, comparison, and interpretation of historical evidence. Stems should name specific events, acts, amendments, or figures where the teacher would test them.
-DEPTH FLOOR: no name-and-date trivia ("who was the first president"). Every question must ask for a cause, a consequence, a comparison across periods, or the best interpretation of a document or set of evidence — AP US History level, not a citizenship quiz.
+DEPTH FLOOR: no name-and-date trivia ("who was the first president"). Every question must ask for a cause, a consequence, a comparison across periods, or the best interpretation of a document or set of evidence — AP US History level, not a citizenship quiz. A single-fact "which of these happened" stem is below the course: require the student to weigh two causes, place an event in a continuity-and-change argument, or read a one-sentence primary-source excerpt and say what it reveals about the period.
 
 ROTATION RULE: Move chronologically forward through the periods, then restart. NEVER ask two questions from the same era in a row.
 
