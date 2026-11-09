@@ -46,7 +46,6 @@ function drillReply(bank, history, message) {
   const qs = bank.questions;
   const total = qs.length;
   const hist = Array.isArray(history) ? history : [];
-  const scored = hist.filter(m => m.role === 'assistant' && /^Correct/i.test(String(m.content || '')));
   let answered = 0;
   for (const m of hist) {
     if (m.role !== 'assistant') continue;
@@ -60,20 +59,27 @@ function drillReply(bank, history, message) {
   };
   if (!answered) return { reply: fmtQ(0) };
 
+  const lastAssistant = [...hist].reverse().find(m => m.role === 'assistant');
+  if (lastAssistant && /Quiz complete/i.test(String(lastAssistant.content || ''))) {
+    return { reply: `That drill is finished — open the Grade Rescue card again for a fresh set.` };
+  }
+
   const q = qs[answered - 1];
   const letter = (String(message || '').toUpperCase().match(/(?:^|[^A-Z])([ABCD])(?:[^A-Z]|$)/) || [])[1];
   if (!letter) return { reply: `Please answer with a single letter — A, B, C or D.\n\n${fmtQ(answered - 1)}` };
 
   const right = letter === q.answer;
-  const corr = scored.length + (right ? 1 : 0);
   const head = right
     ? `Correct. ${q.why}`
     : `Incorrect. The answer is ${q.answer} — ${q.why}`;
-  const tail = `Score: ${corr}/${answered}`;
+  // NEVER emit a server-side tally. The dashboard sends only history.slice(-30),
+  // so any count derived here misses early answers and silently under-reports
+  // (it once cost a perfect 33/33 run down to 16/33). The client counts its own
+  // "Correct" replies and owns the score; the server only grades one answer.
   const next = answered < total
     ? `\n\n${fmtQ(answered)}`
-    : `\n\nQuiz complete — ${bank.title}, ${corr}/${total} (${Math.round((corr / total) * 100)}%).`;
-  return { reply: `${head}\n${tail}${next}` };
+    : `\n\nQuiz complete — that is all ${total} questions for ${bank.title}.`;
+  return { reply: `${head}${next}` };
 }
 
 
