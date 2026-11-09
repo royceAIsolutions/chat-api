@@ -38,9 +38,10 @@ function cleanMissed(missed) {
     if (m && typeof m === 'object') {
       const q = typeof m.q === 'string' ? m.q.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
       const n = Number.isFinite(parseInt(m.n, 10)) ? Math.max(1, Math.min(99, parseInt(m.n, 10))) : null;
-      if (n && q) out.push({ n, q });
-      else if (q) out.push({ q });
-      else if (n) out.push({ n });
+      const picked = typeof m.p === 'string' && /^[A-D]$/i.test(m.p.trim()) ? m.p.trim().toUpperCase() : null;
+      if (n && q) out.push(picked ? { n, q, p: picked } : { n, q });
+      else if (q) out.push(picked ? { q, p: picked } : { q });
+      else if (n) out.push(picked ? { n, p: picked } : { n });
     } else if (typeof m === 'string') {
       const q = m.replace(/\s+/g, ' ').trim().slice(0, 120);
       if (q) out.push({ q });
