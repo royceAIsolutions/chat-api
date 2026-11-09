@@ -35,17 +35,26 @@ function cleanMissed(missed) {
   if (!Array.isArray(missed)) return null;
   const out = [];
   for (const m of missed.slice(0, 40)) {
-    if (m && typeof m === 'object') {
-      const q = typeof m.q === 'string' ? m.q.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
-      const n = Number.isFinite(parseInt(m.n, 10)) ? Math.max(1, Math.min(99, parseInt(m.n, 10))) : null;
-      const picked = typeof m.p === 'string' && /^[A-D]$/i.test(m.p.trim()) ? m.p.trim().toUpperCase() : null;
-      if (n && q) out.push(picked ? { n, q, p: picked } : { n, q });
-      else if (q) out.push(picked ? { q, p: picked } : { q });
-      else if (n) out.push(picked ? { n, p: picked } : { n });
-    } else if (typeof m === 'string') {
-      const q = m.replace(/\s+/g, ' ').trim().slice(0, 120);
-      if (q) out.push({ q });
+    if (!m || typeof m !== 'object') {
+      if (typeof m === 'string') {
+        const q = m.replace(/\s+/g, ' ').trim().slice(0, 120);
+        if (q) out.push({ q });
+      }
+      continue;
     }
+    const q = typeof m.q === 'string' ? m.q.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+    const n = Number.isFinite(parseInt(m.n, 10)) ? Math.max(1, Math.min(99, parseInt(m.n, 10))) : null;
+    const picked = typeof m.p === 'string' && /^[A-D]$/i.test(m.p.trim()) ? m.p.trim().toUpperCase() : null;
+    // Option text lets a generated-deck miss be re-judged later; four short strings, nothing more.
+    const opts = Array.isArray(m.o)
+      ? m.o.filter(x => typeof x === 'string').slice(0, 4).map(x => x.replace(/\s+/g, ' ').trim().slice(0, 60))
+      : null;
+    const entry = {};
+    if (n) entry.n = n;
+    if (q) entry.q = q;
+    if (picked) entry.p = picked;
+    if (opts && opts.length === 4 && opts.every(Boolean)) entry.o = opts;
+    if (Object.keys(entry).length && (entry.q || entry.n)) out.push(entry);
   }
   return out.length ? out : null;
 }
