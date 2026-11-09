@@ -53,6 +53,9 @@ function cleanMissed(missed) {
     if (n) entry.n = n;
     if (q) entry.q = q;
     if (picked) entry.p = picked;
+    // The letter the reply revealed as correct ("The answer is B"), when it said one.
+    const keyed = typeof m.k === 'string' && /^[A-D]$/i.test(m.k.trim()) ? m.k.trim().toUpperCase() : null;
+    if (keyed) entry.k = keyed;
     if (opts && opts.length === 4 && opts.every(Boolean)) entry.o = opts;
     if (Object.keys(entry).length && (entry.q || entry.n)) out.push(entry);
   }
