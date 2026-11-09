@@ -40,7 +40,8 @@ module.exports = async (req, res) => {
       total: s.total,
       percent: s.percent || Math.round(s.correct / s.total * 100),
       topics: { [s.subject || 'general']: `${s.correct}/${s.total}` },
-      passed: (s.percent || Math.round(s.correct / s.total * 100)) >= 80
+      passed: (s.percent || Math.round(s.correct / s.total * 100)) >= 80,
+      ...(Array.isArray(s.missed) && s.missed.length ? { missed: s.missed } : {})
     }));
     
     res.json({ sessions });

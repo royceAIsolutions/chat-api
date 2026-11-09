@@ -26,6 +26,29 @@ function trimScores(list, perStudentCap) {
   return keep;
 }
 
+// ── MISSED-ITEM CAPTURE (Nov 9 2026) ────────────────────────────────────────
+// The ledger used to keep only correct/total, so an unscorable or mis-keyed item
+// inside a finished 33-question run could never be found afterwards — the score was
+// the only evidence. The dashboard now sends the items it graded wrong; store them
+// bounded so a 500-entry ledger stays readable.
+function cleanMissed(missed) {
+  if (!Array.isArray(missed)) return null;
+  const out = [];
+  for (const m of missed.slice(0, 40)) {
+    if (m && typeof m === 'object') {
+      const q = typeof m.q === 'string' ? m.q.replace(/\s+/g, ' ').trim().slice(0, 120) : '';
+      const n = Number.isFinite(parseInt(m.n, 10)) ? Math.max(1, Math.min(99, parseInt(m.n, 10))) : null;
+      if (n && q) out.push({ n, q });
+      else if (q) out.push({ q });
+      else if (n) out.push({ n });
+    } else if (typeof m === 'string') {
+      const q = m.replace(/\s+/g, ' ').trim().slice(0, 120);
+      if (q) out.push({ q });
+    }
+  }
+  return out.length ? out : null;
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -33,7 +56,7 @@ module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'POST only' });
 
-  const { student, correct, total, subject, dryRun, src, run } = req.body;
+  const { student, correct, total, subject, dryRun, src, run, missed } = req.body;
   // ── PROBE SANDBOX (Oct 1 2026) ─────────────────────────────────────────────
   // Monitors must be able to measure real write latency without touching student
   // data. dryRun=true runs the identical GET+PUT round-trip against a throwaway
@@ -67,6 +90,8 @@ module.exports = async (req, res) => {
   const runId = run ? String(run).trim().slice(0, 64) : null;
   const srcTag = src ? String(src).trim().slice(0, 24) : 'web';
   const entry = { student, correct, total, percent: pct, subject: subject || 'quiz', date: today, ts: Date.now() };
+  const missedClean = cleanMissed(missed);
+  if (missedClean) entry.missed = missedClean;
   if (runId) entry.run = runId;
   entry.src = srcTag;
   const CAP = dryRun ? 50 : 500;
@@ -198,3 +223,5 @@ module.exports = async (req, res) => {
     res.json({ saved: true, note: 'Score logged but sync pending', student, correct, total, percent: pct });
   }
 };
+
+module.exports.cleanMissed = cleanMissed;
