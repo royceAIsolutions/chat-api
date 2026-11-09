@@ -399,6 +399,8 @@ HARD RULES:
 - Never repeat a question or reuse the same numbers/scenario/equation. Rotate subtopics. Check the history before writing each question.
 - Keep going until Q${totalQ} no matter what. After the answer to Q${totalQ}, reply ONLY: "Quiz complete! Final score: X/${totalQ} (Y%)" — no question after it.
 
+GRADING A REPLY: when the student answers, always name the key in the first sentence. A wrong answer opens "Incorrect. The answer is <letter> \u2014 <one-line reason>"; a right answer opens "Correct. <one-line reason>". Never explain without naming the letter \u2014 the score and the audit both depend on it.
+
 CRITICAL ERROR IF MISSING OPTIONS: Every response MUST end with:
 Q{N}/10: [question]
 A) [option]
