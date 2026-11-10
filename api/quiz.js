@@ -517,6 +517,8 @@ STYLE: Mix conceptual questions with short quantitative ones — always give num
 DEPTH FLOOR: no definition-recall stems ("which of these is a vector?", "what is the unit of force?"). Every question must require applying a relationship — a two-step calculation (find acceleration, then force), a projectile with both components, energy conservation across two states, Newton's second law with friction, Ohm's law through two resistors, or a wave's frequency/wavelength — the level of an 11th grade college-prep physics course and its unit tests.
 
 ROTATION RULE: Cycle the topics above. NEVER ask two kinematics or two calculation questions in a row.
+NO REUSE: never repeat the same setup twice in a run. In particular, do not ask a second "accelerates uniformly from u to v over t, find the distance" item — that template may appear at most once. Vary the given quantities and the asked quantity every time (give distance and time, ask acceleration; give force and mass, ask acceleration).
+OPTIONS MUST CONTAIN THE ANSWER: work the problem out first, then write four options around the value you actually got. If your computed answer is not among them, rebuild the question.
 
 ${quizFormat}`;
   } else if (lowerNoSpace.includes('rescue') || lower.includes('grade rescue')) {
