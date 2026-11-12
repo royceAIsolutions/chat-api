@@ -9,7 +9,7 @@ const https = require('https');
 // bank ships without a Vercel deploy.
 const DRILL_BANKS = { rescue: require('./_banks/rescue'), apbio: require('./_banks/apbio') };
 const DRILL_REMOTE = 'https://royceai.com/tutor/drill/';
-const BANK_TTL_MS = 10 * 60 * 1000;
+const BANK_TTL_MS = 3 * 60 * 1000;  // short: post-refresh skew must self-clear fast
 const bankCache = {}; // id -> { at, bank }
 
 function fetchJson(url, timeoutMs) {
