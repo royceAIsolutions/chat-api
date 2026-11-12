@@ -7,7 +7,7 @@ const https = require('https');
 // BUNDLED copy is only a fallback. The live set is refreshed daily by a cron
 // job that rewrites tutor/drill/<id>.json in the static-site repo, so a fresh
 // bank ships without a Vercel deploy.
-const DRILL_BANKS = { rescue: require('./_banks/rescue') };
+const DRILL_BANKS = { rescue: require('./_banks/rescue'), apbio: require('./_banks/apbio') };
 const DRILL_REMOTE = 'https://royceai.com/tutor/drill/';
 const BANK_TTL_MS = 10 * 60 * 1000;
 const bankCache = {}; // id -> { at, bank }
@@ -548,8 +548,13 @@ ${quizFormat}`;
 
   // Authored decks bypass the model: fixed questions, keyed answers, exact score.
   // The live set comes from royceai.com/tutor/drill/<id>.json (refreshed daily);
-  // the bundled copy is the offline fallback.
-  const bankKey = lowerNoSpace.includes('rescue') ? 'rescue' : null;
+  // the bundled copy is the offline fallback. `apbio` is Carter's Bio-only card:
+  // the bank is his current unit, so it follows the study guide rather than
+  // touring units 1-8. If the fetch fails, getBank returns null and the deck
+  // falls back to the model prompt plus his coursework line.
+  const bankKey = lowerNoSpace.includes('rescue') ? 'rescue'
+    : (lowerNoSpace.includes('apbio') || lower.includes('ap biology') || lower.includes('ap bio')) ? 'apbio'
+    : null;
   if (bankKey) {
     const bank = await getBank(bankKey);
     if (bank) return res.json(drillReply(bank, history, message));
