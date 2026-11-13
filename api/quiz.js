@@ -89,12 +89,17 @@ function setFromHistory(sets, answered, hist) {
   if (!last) return -1;
   const hit = String(last.content || '').match(/Q\d+\s*\/\s*\d+\s*:\s*([^\n]+)/);
   if (!hit) return -1;
-  const shown = hit[1].trim().slice(0, 40);
+  const shown = hit[1].trim();
+  const short = shown.slice(0, 40);
+  let byPrefix = -1;
   for (let i = 0; i < sets.length; i++) {
     const q = sets[i][answered - 1];
-    if (q && String(q.stem || '').trim().slice(0, 40) === shown) return i;
+    if (!q) continue;
+    const stem = String(q.stem || '').trim();
+    if (stem === shown) return i;                       // exact: the common case
+    if (byPrefix < 0 && stem.slice(0, 40) === short) byPrefix = i;
   }
-  return -1;
+  return byPrefix;
 }
 
 function setAtStart(sets, hist, message) {
