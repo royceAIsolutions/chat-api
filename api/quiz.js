@@ -34,7 +34,10 @@ function isBank(b) {
 async function getBank(id) {
   const hit = bankCache[id];
   if (hit && Date.now() - hit.at < BANK_TTL_MS) return hit.bank;
-  const remote = await fetchJson(DRILL_REMOTE + id + '.json');
+  // Cache-bust the CDN: GitHub Pages will otherwise serve the previous set for
+  // minutes after a publish, and the deck then looks updated while serving old
+  // questions. The per-instance TTL above already limits how often we refetch.
+  const remote = await fetchJson(DRILL_REMOTE + id + '.json?cb=' + Date.now());
   const bank = isBank(remote) ? remote : DRILL_BANKS[id];
   if (!bank) return null;
   bankCache[id] = { at: Date.now(), bank };
