@@ -554,6 +554,9 @@ ${quizFormat}`;
   // falls back to the model prompt plus his coursework line.
   const bankKey = lowerNoSpace.includes('rescue') ? 'rescue'
     : (lowerNoSpace.includes('apbio') || lower.includes('ap biology') || lower.includes('ap bio')) ? 'apbio'
+    : (lowerNoSpace.includes('apeng') || lower.includes('ap english') || lower.includes('ap lang')) ? 'apeng'
+    : lower.includes('physics') ? 'physics'
+    : lower.includes('math') ? 'math'
     : null;
   if (bankKey) {
     const bank = await getBank(bankKey);
