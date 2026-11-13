@@ -42,9 +42,75 @@ async function getBank(id) {
 }
 
 
+// ── MULTI-SET BANKS: A DIFFERENT SET EVERY SESSION ───────────────────────────
+// A bank used to be one fixed 33-item list, so the second quiz of a week asked
+// the same questions in the same order — the student memorises the set instead
+// of the material. A bank may now carry `sets: [{set, generated, questions}]`
+// (plus `questions` = the newest set, for older readers). The deck must resolve
+// the SAME set on every turn of one drill, and a DIFFERENT one on the next:
+//
+//  - within a drill: the graded reply always restates the question it just
+//    graded, so the set is recovered by matching that stem against each set at
+//    position n. No server state, survives a lost seed.
+//  - at Q1: the dashboard sends `Set: <n>` (a localStorage rotation counter, so
+//    consecutive sessions cannot collide) and `Seed: <random>`; Discord and the
+//    iOS client send only a seed, which hashes to a set index.
+function bankSets(bank) {
+  if (bank && Array.isArray(bank.sets) && bank.sets.length) {
+    const list = bank.sets
+      .map(s => (Array.isArray(s) ? s : (s && Array.isArray(s.questions) ? s.questions : [])))
+      .filter(a => a.length >= 5);
+    if (list.length) return list;
+  }
+  const qs = ((bank && bank.questions) || []).filter(Boolean);
+  const grouped = {};
+  qs.forEach(q => {
+    const k = Number(q.set || 1);
+    grouped[k] = grouped[k] || [];
+    grouped[k].push(q);
+  });
+  const keys = Object.keys(grouped).sort((a, b) => Number(a) - Number(b));
+  return keys.length > 1 ? keys.map(k => grouped[k]) : [qs];
+}
+
+function hashStr(s) {
+  let h = 2166136261 >>> 0;
+  const str = String(s || '');
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+function setFromHistory(sets, answered, hist) {
+  if (!answered) return -1;
+  const last = [...hist].reverse().find(m => m.role === 'assistant');
+  if (!last) return -1;
+  const hit = String(last.content || '').match(/Q\d+\s*\/\s*\d+\s*:\s*([^\n]+)/);
+  if (!hit) return -1;
+  const shown = hit[1].trim().slice(0, 40);
+  for (let i = 0; i < sets.length; i++) {
+    const q = sets[i][answered - 1];
+    if (q && String(q.stem || '').trim().slice(0, 40) === shown) return i;
+  }
+  return -1;
+}
+
+function setAtStart(sets, hist, message) {
+  const starts = hist.filter(m => m.role === 'user' && /^\s*Start\b/i.test(String(m.content || '')))
+    .map(m => String(m.content));
+  if (/^\s*Start\b/i.test(String(message || ''))) starts.push(String(message));
+  const joined = starts.join(' ');
+  const explicit = joined.match(/\bSet:\s*(\d+)/i);
+  if (explicit) return Number(explicit[1]) % sets.length;
+  const seed = joined.match(/\bSeed:\s*([A-Za-z0-9]+)/i);
+  if (seed) return hashStr(seed[1]) % sets.length;
+  return 0;
+}
+
 function drillReply(bank, history, message) {
-  const qs = bank.questions;
-  const total = qs.length;
+  const sets = bankSets(bank);
   const hist = Array.isArray(history) ? history : [];
   let answered = 0;
   for (const m of hist) {
@@ -52,6 +118,11 @@ function drillReply(bank, history, message) {
     const hit = String(m.content || '').match(/Q(\d+)\s*\/\s*(\d+)/);
     if (hit && Number(hit[1]) > answered) answered = Number(hit[1]);
   }
+  // Resolve the session's set before anything is served or graded.
+  let setIdx = setFromHistory(sets, answered, hist);
+  if (setIdx < 0) setIdx = setAtStart(sets, hist, message);
+  const qs = sets[setIdx] || sets[0];
+  const total = qs.length;
   const fmtQ = (i) => {
     const q = qs[i];
     return `Q${q.n}/${total}: ${q.stem}\n` +
@@ -61,7 +132,7 @@ function drillReply(bank, history, message) {
 
   const lastAssistant = [...hist].reverse().find(m => m.role === 'assistant');
   if (lastAssistant && /Quiz complete/i.test(String(lastAssistant.content || ''))) {
-    return { reply: `That drill is finished — open the Grade Rescue card again for a fresh set.` };
+    return { reply: `That drill is finished — open the ${bank.title || 'deck'} card again for a fresh set.` };
   }
 
   const q = qs[answered - 1];
