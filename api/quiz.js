@@ -522,6 +522,8 @@ OPTIONS MUST CONTAIN THE ANSWER: for math, compute the value first, then build f
 
 ROTATION RULE: Strict rotation Reading -> Math -> Science -> English, then repeat. Inside Science, never two anatomy questions in a row. Change the passage, the numbers, and the body system every question.
 
+NO REUSE: the reading item is not always a hospital-workflow passage. Across a drill spread the Reading passages over distinct domains — a short science or health-literacy explainer, a workplace memo, a history or civics excerpt, a chart or label, and one literary or opinion passage. Never write a second passage about shift handoffs, checklists, or hospital safety culture; that is one template, not five questions. Math items must not repeat the same operation mix, and science items must not repeat the same lab value twice.
+
 ${quizFormat}`;
   } else if (lowerNoSpace.includes('ivcprep') || lower.includes('college readiness') || lower.includes('ivc placement')) {
     system = `You are a college-readiness tutor for a first-time Irvine Valley College student who must finish guided self-placement in math and English before she can register.
