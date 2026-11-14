@@ -511,6 +511,30 @@ ${quizFormat}`;
 
 ROTATION RULE: Rotate between algebra, geometry, precalculus, and calculus. Each question must be a different subtopic. Use different numbers, equations, and problem types every time. NEVER reuse the same equation or problem structure.`;
     system = `${MATH_DECKS[mathLevel] || genericMath}\n\nSCOPE: every question in this quiz is a math question. Never ask science, English, or history questions, even as a "change of pace".\n\n${quizFormat}`;
+  } else if (lowerNoSpace.includes('teas') || lower.includes('nursing entrance')) {
+    system = `You are a TEAS 7 exam prep tutor for a student entering the RN program at Irvine Valley College.
+
+COVERAGE: the four TEAS sections in the exam's real proportions — Reading (key ideas and details, craft and structure, integration of knowledge: main idea, inference, author's purpose, evaluating an argument, comparing two passages, reading tables and labels), Mathematics (numbers and algebra: fractions, decimals, percents, ratios, proportions, order of operations, algebraic expressions and equations, unit conversion; data interpretation: tables, graphs, mean/median/mode, simple probability), Science (human anatomy and physiology — cardiovascular, respiratory, digestive, renal, endocrine, immune, musculoskeletal, nervous, reproductive; life and physical science — cells, DNA, genetics, macromolecules, states of matter, acids and bases, motion and force; scientific reasoning), and English and Language Usage (grammar, punctuation, sentence structure, spelling, vocabulary, formal vs. informal register).
+
+STYLE: TEAS-style four-option items — one best answer and three distractors a half-prepared student would pick. Science items are applied ("a patient's lab result shows ..."), math items must be worked out, reading items give a 2-4 sentence passage. No "select all that apply" and no dosage-calculation items — those are the nursing program's exams, not the TEAS.
+
+OPTIONS MUST CONTAIN THE ANSWER: for math, compute the value first, then build four options around the number you actually got. If your answer is not among them, rebuild the item.
+
+ROTATION RULE: Strict rotation Reading -> Math -> Science -> English, then repeat. Inside Science, never two anatomy questions in a row. Change the passage, the numbers, and the body system every question.
+
+${quizFormat}`;
+  } else if (lowerNoSpace.includes('ivcprep') || lower.includes('college readiness') || lower.includes('ivc placement')) {
+    system = `You are a college-readiness tutor for a first-time Irvine Valley College student who must finish guided self-placement in math and English before she can register.
+
+COVERAGE: Math placement — fractions, decimals, percents, ratios and proportions, order of operations, evaluating and solving linear equations and inequalities, slope and graphing, exponent rules, polynomial arithmetic, factoring, quadratics, systems of two equations, geometry (perimeter, area, volume, right triangles), and reading tables, graphs and averages. English placement — reading comprehension (main idea, inference, vocabulary in context, author's purpose, tone, summarizing an argument) and sentence-level writing (subject-verb agreement, pronoun reference, fragments and comma splices, verb tense, misplaced modifiers, parallelism, and choosing the clearest revision).
+
+STYLE: the kinds of items a placement instrument actually asks — computation worked out, a 2-4 sentence passage with one best-answer question, and "which revision is clearest" items. No trivia, no literary analysis, no AP-style rhetoric.
+
+OPTIONS MUST CONTAIN THE ANSWER: for math, compute the value first, then write four options around it.
+
+ROTATION RULE: Alternate Math -> English -> Math. Inside math rotate arithmetic, algebra, geometry and data; inside English rotate comprehension and sentence-level writing. Never two questions on the same micro-skill in a row.
+
+${quizFormat}`;
   } else if (lower.includes('rn') || lower.includes('nursing') || lower.includes('nclex')) {
     system = `You are an NCLEX-RN exam prep tutor covering pharmacology, anatomy, physiology, and nursing practices.
 
@@ -787,6 +811,8 @@ ${quizFormat}`;
               else if (t.includes('physics')) subject = 'physics';
               else if (t.includes('sat')) subject = 'sat';
               else if (t.includes('math')) subject = 'math';
+              else if (t.includes('teas') || t.includes('nursing entrance')) subject = 'teas';
+              else if (t.includes('ivcprep') || t.includes('college readiness')) subject = 'ivcprep';
               else if (t.includes('rn') || t.includes('nursing') || t.includes('nclex')) subject = 'rn';
               else if (t.includes('grade9') || t.includes('freshman')) subject = 'grade9';
               else if (t.includes('grade11') || t.includes('junior')) subject = 'grade11';
