@@ -7,7 +7,8 @@ const https = require('https');
 // BUNDLED copy is only a fallback. The live set is refreshed daily by a cron
 // job that rewrites tutor/drill/<id>.json in the static-site repo, so a fresh
 // bank ships without a Vercel deploy.
-const DRILL_BANKS = { rescue: require('./_banks/rescue'), apbio: require('./_banks/apbio') };
+const DRILL_BANKS = { rescue: require('./_banks/rescue'), apbio: require('./_banks/apbio'),
+                      physics: require('./_banks/physics') };
 const DRILL_REMOTE = 'https://royceai.com/tutor/drill/';
 const BANK_TTL_MS = 3 * 60 * 1000;  // short: post-refresh skew must self-clear fast
 const bankCache = {}; // id -> { at, bank }
