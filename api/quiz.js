@@ -158,7 +158,9 @@ function drillReply(bank, history, message) {
   // "Correct" replies and owns the score; the server only grades one answer.
   const next = answered < total
     ? `\n\n${fmtQ(answered)}`
-    : `\n\nQuiz complete — that is all ${total} questions for ${bank.title}.`;
+    : (sets.length > 1
+        ? `\n\nQuiz complete — that is all ${total} questions in set ${setIdx + 1} of ${sets.length} for ${bank.title}. Open the card again for a new set; the next one is set ${((setIdx + 1) % sets.length) + 1}.`
+        : `\n\nQuiz complete — that is all ${total} questions for ${bank.title}.`);
   return { reply: `${head}${next}` };
 }
 
